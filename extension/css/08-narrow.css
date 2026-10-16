@@ -1,0 +1,9 @@
+/* ===== Вузькі екрани ===== */
+@media (max-width: 860px) {
+  .filterbar { position: static; padding: 10px 16px; }
+  .pills { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .pills .pop-panel { position: fixed; left: 16px; right: 16px; top: auto; width: auto; max-width: none; }
+  .resultbar, .content { padding-left: 16px; padding-right: 16px; }
+  .comparebar { left: 12px; right: 12px; transform: none; border-radius: 16px; max-width: none; }
+  .comparebar .achip { max-width: 100%; }
+}

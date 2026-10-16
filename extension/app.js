@@ -1,3 +1,4 @@
+// ЗГЕНЕРОВАНО з src/app/*.js командою `python3 build.py`. Не редагуйте цей файл — редагуйте частини в src/app/.
 // Інтерфейс підбору вибіркових дисциплін.
 // Працює і як окрема сторінка (index.html), і всередині сайту через розширення (content.js).
 // ElectivesApp.mount(element, data, env)
@@ -154,12 +155,16 @@
         </nav>
         <div class="top-right">
           <div id="account" class="account"></div>
-          <select id="theme" class="theme-sel" aria-label="Тема оформлення" title="Тема оформлення">
-            <option value="tntu">Тема: ТНТУ</option><option value="classic">Тема: класична</option>
-            <option value="dark">Тема: темна</option><option value="auto">Тема: як у системі</option>
-          </select>
+          <details class="pop right theme-pop">
+            <summary class="top-ic" title="Тема оформлення" aria-label="Тема оформлення"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg></summary>
+            <div class="pop-panel theme-menu" role="menu">
+              <div class="lbl">Тема оформлення</div>
+              ${[["tntu", "ТНТУ", "світла, як сайт"], ["classic", "Класична", "теплий світлий фон"], ["dark", "Темна", "завжди темна"], ["auto", "Як у системі", "світла або темна"]]
+                .map(([v, l, d]) => `<button class="theme-opt" data-theme-set="${v}" role="menuitemradio"><span class="sw sw-${v}"></span><span><b>${l}</b><small>${d}</small></span></button>`).join("")}
+            </div>
+          </details>
           <button id="plan-btn" class="plan-btn" title="Мій план і підбір комбінацій"></button>
-          ${env.close ? `<button id="close" class="ghost-ink" title="Закрити (Esc)">✕</button>` : ""}
+          ${env.close ? `<button id="close" class="top-ic" title="Закрити (Esc)" aria-label="Закрити">✕</button>` : ""}
         </div>
       </header>
 
@@ -311,8 +316,15 @@
       rebuildAccount(); render();
     });
     if (env.close) $("#close").addEventListener("click", env.close);
-    $("#theme").value = root.dataset.theme;
-    $("#theme").addEventListener("change", e => { root.dataset.theme = e.target.value; store.set("theme", e.target.value); });
+    const syncTheme = () => root.querySelectorAll("[data-theme-set]").forEach(b => {
+      b.classList.toggle("on", b.dataset.themeSet === root.dataset.theme); b.setAttribute("aria-checked", b.dataset.themeSet === root.dataset.theme);
+    });
+    root.querySelector(".theme-menu").addEventListener("click", e => {
+      const b = e.target.closest("[data-theme-set]"); if (!b) return;
+      root.dataset.theme = b.dataset.themeSet; store.set("theme", b.dataset.themeSet); syncTheme();
+      b.closest("details").open = false;
+    });
+    syncTheme();
 
     // ---------- шухляда плану ----------
     const openDrawer = (v = true) => { $("#drawer").classList.toggle("open", v); $("#drawer-back").hidden = !v; };
@@ -482,11 +494,15 @@
     }
     const planSum = s => basket.filter(x => x.sem === s.key).reduce((a, x) => a + x.credits, 0);
     function renderPlanBtn() {
-      $("#plan-btn").innerHTML = `<span class="pb-title">${esc(variants.length > 1 ? curVariant().name : "План")}</span>` + plan.map(s => {
-        const sum = planSum(s), t = +s.target || 0;
-        const st = !t ? "" : sum === t ? "full" : sum > t ? "over" : "";
-        return `<span class="pb-sem ${st}"><i>${esc(s.short)}</i>${fmt(sum)}${t ? "/" + fmt(t) : ""}</span>`;
-      }).join("");
+      const state = (sum, t) => !t ? "" : sum === t ? "full" : sum > t ? "over" : "";
+      const all = plan.reduce((a, s) => a + planSum(s), 0), allT = plan.reduce((a, s) => a + (+s.target || 0), 0);
+      const okAll = plan.every(s => !+s.target || planSum(s) === +s.target);
+      $("#plan-btn").innerHTML = `<span class="pb-title">${esc(variants.length > 1 ? curVariant().name : "План")}</span>`
+        + `<span class="pb-sems">${plan.map(s => {
+          const sum = planSum(s), t = +s.target || 0;
+          return `<span class="pb-sem ${state(sum, t)}"><i>${esc(s.short)}</i>${fmt(sum)}${t ? "/" + fmt(t) : ""}</span>`;
+        }).join("")}</span>`
+        + `<span class="pb-sem pb-total ${allT ? (okAll && all === allT ? "full" : all > allT ? "over" : "") : ""}">${fmt(all)}${allT ? "/" + fmt(allT) : ""}</span>`;
     }
     function renderPlan() {
       let html = `<div class="variants">
@@ -933,6 +949,7 @@
       const similarLast = (a, b) => aiRules.nomand ? !!blockState(a)?.similar - !!blockState(b)?.similar : 0;
       return pool.sort((a, b) => similarLast(a, b) || yearFirst(a, b) || SORTS.smart(a, b)).slice(0, 260);
     }
+
     async function runAI() {
       const s = plan.find(p => p.key === $("#ai-sem").value) || plan[0];
       const target = +s.target || 0, have = planSum(s);
@@ -1154,7 +1171,7 @@ ${pool.map(line).join("\n")}`;
       else if (accountState === "loading" && !account) el.innerHTML = `<span class="acc muted">Читаю акаунт…</span>`;
       else if (accountState === "error" && !account) el.innerHTML = `<button class="acc bad" id="acc-refresh" title="${esc(accountError)}">Акаунт не прочитано — ще раз</button>`;
       else if (account) el.innerHTML = `<button class="acc" id="acc-refresh" title="Оновлено ${esc(account.at)}. Натисніть, щоб оновити.">
-          <span class="ava">👤</span><span>${esc(account.speciality || "Акаунт")}</span><small>${accountState === "loading" ? "оновлюю…" : accountState === "error" ? "помилка" : "↻"}</small></button>`;
+          <span class="ava">👤</span><span class="acc-name">${esc(account.speciality || "Акаунт")}</span><small class="acc-st ${accountState === "loading" ? "spinning" : ""}">${accountState === "error" ? "!" : "↻"}</small></button>`;
       const r = $("#acc-refresh"); if (r) r.onclick = loadAccount;
 
       const ma = $("#mand-account");

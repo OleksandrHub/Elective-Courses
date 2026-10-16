@@ -1,0 +1,12 @@
+/* ===== Футер і документи ===== */
+.foot { max-width: 1180px; margin: 10px auto 0; padding: 22px 22px 100px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; display: grid; gap: 6px; }
+.foot a { color: var(--ink); font-weight: 600; text-decoration: none; }
+.foot a:hover { text-decoration: underline; }
+.foot-links { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.el-app .foot-links .link { color: var(--ink); font-weight: 600; text-decoration: none; padding: 0; }
+.el-app .foot-links .link:hover { text-decoration: underline; }
+.foot-note { font-size: 12px; }
+.doc { max-width: 72ch; }
+.doc h3 { font-size: 15px; margin: 16px 0 4px; }
+.doc p, .doc li { line-height: 1.55; }
+.doc ul { padding-left: 20px; margin: 4px 0; }

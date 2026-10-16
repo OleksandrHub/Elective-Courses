@@ -1,0 +1,43 @@
+/* ===== Шухляда плану ===== */
+.drawer-back { position: fixed; inset: 0; z-index: 40; background: rgba(10, 13, 19, .35); }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 41; width: min(430px, 100%); background: var(--paper); box-shadow: -10px 0 40px rgba(0, 0, 0, .2);
+  transform: translateX(105%); transition: transform .22s ease; overflow: auto; padding: 0 18px 30px; }
+.drawer.open { transform: none; }
+.drawer-head { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; padding: 16px 0 10px; background: var(--paper); }
+.drawer-head h2 { font-size: 22px; letter-spacing: -.02em; }
+.psem { background: var(--surface); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
+.psem-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.psem-head input { width: 64px; padding: 3px 6px; }
+.gauge { height: 8px; border-radius: 99px; background: var(--sunken); overflow: hidden; margin: 10px 0 6px; }
+.gauge div { height: 100%; background: var(--amber); border-radius: 99px; transition: width .25s; }
+.gauge.full div { background: var(--zalik); }
+.gauge.over div { background: var(--exam); }
+.psem-sum { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+.psem-sum span { color: var(--muted); }
+.pitem { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.pitem .ctl { justify-content: center; padding: 2px 0; }
+.pitem-name a { text-decoration: none; font-weight: 600; }
+.pitem-ctl { display: flex; align-items: center; gap: 4px; }
+.pitem-ctl select { padding: 2px 4px; font-size: 12px; border-radius: 7px; }
+.pempty { padding: 8px 0 2px; }
+.combos-box { margin-top: 18px; }
+.combos-box h3 { font-size: 17px; margin-bottom: 4px; }
+.combos-box p { margin: 0 0 10px; }
+.combos-box input { width: 48px; padding: 3px 6px; }
+.combo { background: var(--surface); border-radius: 12px; padding: 10px 12px; margin-top: 8px; box-shadow: var(--shadow); }
+.combo ul { list-style: none; margin: 0 0 8px; padding: 0; }
+.combo li { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 3px 0; font-size: 13px; }
+.combo li .ctl { justify-content: center; padding: 1px 0; }
+
+/* ===== Порівняння і модалка ===== */
+.comparebar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 25; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  background: var(--navy); color: var(--on-navy); border-radius: 999px; padding: 8px 8px 8px 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); max-width: calc(100% - 32px); }
+.comparebar .hint { color: var(--on-navy-muted); }
+.comparebar .achip { background: var(--navy-2); color: var(--on-navy); }
+.comparebar .achip button { color: var(--on-navy); }
+.el-app .comparebar .primary { background: var(--amber); border-color: var(--amber); color: var(--on-amber); border-radius: 999px; }
+.el-app .comparebar .ghost { color: var(--on-navy-muted); }
+.modal { position: fixed; inset: 0; z-index: 50; background: rgba(10, 13, 19, .5); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal-box { position: relative; background: var(--paper); border-radius: 18px; padding: 22px; width: min(1150px, 100%); max-height: 90vh; overflow: auto; }
+.modal-box h2 { font-size: 22px; margin-bottom: 14px; }
+.modal-x { position: absolute; top: 14px; right: 14px; }

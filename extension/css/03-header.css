@@ -1,0 +1,87 @@
+/* ===== Верхня панель ===== */
+.el-app { --top-h: 60px; }
+.top { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "brand tabs actions";
+  align-items: center; column-gap: 20px; padding: 0 20px; height: var(--top-h); background: var(--navy); color: var(--on-navy); }
+.brand { grid-area: brand; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand .logo { flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--amber); color: var(--on-amber); display: grid; place-items: center; font-weight: 800; font-size: 18px; }
+.brand b { display: block; font-size: 16px; letter-spacing: -.01em; white-space: nowrap; }
+.brand small { display: block; color: var(--on-navy-muted); font-size: 11.5px; white-space: nowrap; }
+.tabs { grid-area: tabs; display: flex; gap: 2px; height: 100%; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.el-app .tabs button { flex: none; background: none; border: none; border-radius: 0; color: var(--on-navy-muted); font-weight: 600; padding: 0 12px; height: 100%;
+  border-bottom: 3px solid transparent; border-top: 3px solid transparent; white-space: nowrap; }
+.el-app .tabs button:hover { color: var(--on-navy); }
+.el-app .tabs button[aria-selected=true] { color: var(--on-navy); border-bottom-color: var(--amber); }
+.top-right { grid-area: actions; display: flex; align-items: center; gap: 8px; justify-self: end; }
+.account { display: flex; min-width: 0; }
+
+/* кнопки-іконки в шапці */
+.el-app .top-ic { width: 36px; height: 36px; padding: 0; display: inline-grid; place-items: center; border-radius: 10px; font-size: 16px; line-height: 1;
+  background: var(--navy-2); border: 1px solid transparent; color: var(--on-navy); cursor: pointer; list-style: none; }
+.el-app .top-ic:hover { border-color: var(--on-navy-muted); }
+summary.top-ic::-webkit-details-marker { display: none; }
+summary.top-ic::marker { content: ""; }
+
+/* акаунт */
+.el-app .acc { display: inline-flex; align-items: center; gap: 8px; height: 36px; background: var(--navy-2); border: 1px solid transparent; color: var(--on-navy);
+  border-radius: 999px; padding: 0 12px 0 5px; font-size: 13px; max-width: 280px; white-space: nowrap; }
+.el-app .acc:hover { border-color: var(--on-navy-muted); }
+.acc .acc-name { overflow: hidden; text-overflow: ellipsis; }
+.acc .ava { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--on-navy); display: grid; place-items: center; font-size: 13px; }
+.acc .acc-st { color: var(--on-navy-muted); font-size: 14px; }
+.acc .acc-st.spinning { display: inline-block; animation: el-spin 1s linear infinite; }
+.acc.muted { color: var(--on-navy-muted); padding: 0 12px; }
+.el-app .acc.bad { background: var(--exam); color: #fff; padding: 0 12px; }
+
+/* тема */
+.theme-pop .pop-panel { width: 230px; padding: 8px; top: calc(100% + 10px); }
+.theme-menu .lbl { margin: 4px 8px 6px; }
+.el-app .theme-opt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 1px solid transparent; background: none; border-radius: 10px; padding: 7px 8px; color: var(--ink); }
+.el-app .theme-opt:hover { background: var(--sunken); border-color: transparent; }
+.el-app .theme-opt.on { background: var(--sunken); border-color: var(--amber); }
+.theme-opt b { display: block; font-size: 13.5px; }
+.theme-opt small { display: block; color: var(--muted); font-size: 11.5px; }
+.sw { flex: none; width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, .12); }
+.sw-tntu { background: linear-gradient(135deg, #405d72 50%, #f5f8fb 50%); }
+.sw-classic { background: linear-gradient(135deg, #17223b 50%, #f0a500 50%); }
+.sw-dark { background: linear-gradient(135deg, #0a0d13 50%, #2a3140 50%); }
+.sw-auto { background: linear-gradient(135deg, #f6f3ec 50%, #0f1218 50%); }
+
+/* кнопка плану */
+.el-app .plan-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; background: var(--amber); color: var(--on-amber); border: none;
+  border-radius: 999px; padding: 0 5px 0 14px; font-weight: 700; white-space: nowrap; }
+.pb-sems { display: inline-flex; gap: 4px; }
+.pb-sem { background: rgba(0, 0, 0, .12); border-radius: 999px; padding: 3px 9px; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.pb-sem i { font-style: normal; font-weight: 500; opacity: .8; margin-right: 4px; }
+.pb-sem.full { background: var(--zalik); color: #fff; }
+.pb-sem.over { background: var(--exam); color: #fff; }
+.pb-total { display: none; }
+.pb-title { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ноутбук: ховаємо підпис під назвою */
+@media (max-width: 1240px) {
+  .brand small { display: none; }
+  .acc .acc-name { max-width: 150px; }
+}
+/* планшет: вкладки — окремим рядком на всю ширину */
+@media (max-width: 1020px) {
+  .el-app { --top-h: 104px; }
+  .top { grid-template-columns: auto 1fr; grid-template-areas: "brand actions" "tabs tabs"; grid-template-rows: 58px 46px; padding: 0 16px; }
+  .tabs { border-top: 1px solid rgba(255, 255, 255, .1); margin: 0 -16px; padding: 0 8px; }
+  .el-app .tabs button { flex: 1 0 auto; }
+}
+/* телефон: компактні кнопки */
+@media (max-width: 640px) {
+  .top-right { gap: 6px; }
+  .acc .acc-name, .acc .acc-st { display: none; }
+  .el-app .acc { padding: 0 5px; }
+  .pb-sems { display: none; }
+  .pb-total { display: inline-block; }
+  .el-app .plan-btn { padding: 0 4px 0 12px; }
+  .el-app .tabs button { padding: 0 10px; font-size: 13.5px; }
+}
+@media (max-width: 330px) { .pb-title { display: none; } }
+@media (max-width: 440px) {
+  .brand b { display: none; }
+  .el-app .plan-btn { padding: 0 4px; }
+}

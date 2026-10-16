@@ -1,0 +1,16 @@
+/* ===== Варіанти плану ===== */
+.variants { margin-bottom: 12px; }
+.vtabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.el-app .vtab { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 12px; font-weight: 600; font-size: 13px; background: var(--surface); }
+.el-app .vtab small { font-weight: 700; font-size: 11px; background: var(--sunken); border-radius: 999px; padding: 0 6px; color: var(--muted); }
+.el-app .vtab.on { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
+.el-app .vtab.on small { background: rgba(255, 255, 255, .2); color: var(--on-navy); }
+.el-app .vtab.add { border-style: dashed; color: var(--muted); }
+.vactions { display: flex; gap: 12px; margin-top: 6px; font-size: 12.5px; }
+.vcmp { margin-bottom: 12px; }
+.vcmp .tbl { font-size: 12.5px; }
+.vcmp .tbl th, .vcmp .tbl td { padding: 6px 8px; }
+.vcmp .tbl button.link { text-decoration: none; font-weight: 600; color: var(--ink); padding: 0; }
+.bad-text { color: var(--exam); }
+.semtabs .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; align-self: center; }
+.el-app .semtabs .chip.sem.on::before { content: "✓ "; }

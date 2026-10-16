@@ -1,0 +1,24 @@
+/* ===== Звіт ===== */
+.report-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin: 18px 0 14px; }
+.report-head h1 { font-size: 28px; letter-spacing: -.03em; }
+.report-head p { margin: 4px 0 0; }
+.semtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.tile { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+.tile b { display: block; font-size: 28px; letter-spacing: -.03em; line-height: 1.1; }
+.tile span { color: var(--muted); font-size: 12.5px; }
+.tile.exam b { color: var(--exam); }
+.tile.zalik b { color: var(--zalik); }
+.tiles.summary .tile { background: var(--navy); color: var(--on-navy); }
+.tiles.summary .tile span { color: var(--on-navy-muted); }
+.tiles.summary .tile.exam b { color: #ff9a8f; }
+.tiles.summary .tile.zalik b { color: #6fe0b4; }
+.rsem { margin: 26px 0; }
+.rsem-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.rsem-head h2 { font-size: 20px; }
+.rsem-head h2 span { color: var(--muted); font-weight: 500; font-size: 15px; }
+.type { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+.type.mand { background: var(--sunken); color: var(--muted); }
+.type.plan { background: var(--amber-soft); color: var(--warn); }
+.type.site { background: var(--zalik-soft); color: var(--zalik); }
+@media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

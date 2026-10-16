@@ -1,0 +1,11 @@
+/* ===== Кнопки ===== */
+.el-app button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 6px 12px; }
+.el-app button:hover { border-color: var(--muted); }
+.el-app button:disabled { opacity: .45; cursor: default; }
+.el-app button.primary { background: var(--navy); border-color: var(--navy); color: var(--on-navy); font-weight: 600; }
+.el-app button.ghost { background: none; border-color: transparent; color: var(--muted); }
+.el-app button.link { background: none; border: none; padding: 0 4px; color: var(--muted); text-decoration: underline; }
+.el-app :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.el-app input[type=number], .el-app input[type=search], .el-app textarea, .el-app select {
+  font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 9px; }
+.el-app textarea { width: 100%; min-height: 90px; resize: vertical; }

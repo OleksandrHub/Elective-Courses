@@ -1,0 +1,13 @@
+/* Стилі інтерфейсу. Порядок важливий: пізніші файли перекривають ранні. */
+@import url("01-tokens.css");
+@import url("02-base.css");
+@import url("03-header.css");
+@import url("04-filters.css");
+@import url("05-catalog.css");
+@import url("06-report.css");
+@import url("07-plan.css");
+@import url("08-narrow.css");
+@import url("09-ai.css");
+@import url("10-variants.css");
+@import url("11-footer.css");
+@import url("12-terms.css");
