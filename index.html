@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вибіркові ТНТУ</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Вибіркові дисципліни ТНТУ</h1>
+  <span class="meta" id="meta"></span>
+</header>
+
+<div class="layout">
+  <!-- ФІЛЬТРИ -->
+  <aside class="left">
+    <div class="panel">
+      <h2>Фільтри</h2>
+      <input type="text" id="q" placeholder="Пошук: назва, викладач, мета курсу…">
+
+      <label class="f">Кредити ЄКТС</label>
+      <div class="chips" id="f-credits"></div>
+
+      <label class="f">Підсумковий контроль</label>
+      <div class="chips" id="f-control"></div>
+
+      <label class="f">Рекомендований рік навчання</label>
+      <div class="chips" id="f-year"></div>
+
+      <label class="f">Семестр</label>
+      <div class="chips" id="f-sem"></div>
+
+      <label class="f">Мова</label>
+      <div class="chips" id="f-lang"></div>
+
+      <label class="f">Статус у силабусі</label>
+      <div class="chips" id="f-kind"></div>
+
+      <label class="f">Кафедра</label>
+      <select id="f-dep"><option value="">Усі</option></select>
+
+      <label class="f">Спеціальність (для якої силабус)</label>
+      <select id="f-spec"><option value="">Усі</option></select>
+
+      <label class="check"><input type="checkbox" id="f-nocw"> Без курсової роботи</label>
+      <label class="check"><input type="checkbox" id="f-star"> Лише ★ цікаві</label>
+      <label class="check"><input type="checkbox" id="f-hideblocked" checked> Ховати мої обов’язкові</label>
+      <label class="check"><input type="checkbox" id="f-hidesimilar"> Ховати й схожі назви</label>
+      <div class="row" style="margin-top:10px"><button id="reset">Скинути фільтри</button></div>
+    </div>
+
+    <div class="panel">
+      <h2>Мої обов’язкові дисципліни</h2>
+      <div class="muted">По одній на рядок. Курси з такою ж назвою буде приховано, схожі позначено ⚠.</div>
+      <textarea id="mandatory" placeholder="Вища математика&#10;Програмування&#10;…"></textarea>
+      <label class="f">Підставити обов’язкові з силабусів моєї спеціальності</label>
+      <select id="my-spec"><option value="">— оберіть спеціальність —</option></select>
+      <div class="row" style="margin-top:6px"><button id="fill-mandatory">Додати до списку</button></div>
+      <div class="muted" style="margin-top:6px">Береться все, що в силабусі позначено «Обов’язкова» для цієї спеціальності. Перевірте за навчальним планом.</div>
+    </div>
+  </aside>
+
+  <!-- СПИСОК -->
+  <main>
+    <div class="toolbar">
+      <span class="count" id="count"></span>
+      <span class="muted">Сортувати:</span>
+      <select id="sort" style="width:auto">
+        <option value="rating">за рейтингом</option>
+        <option value="name">за назвою</option>
+        <option value="credits">за кредитами</option>
+        <option value="year">за роком навчання</option>
+      </select>
+    </div>
+    <div class="list" id="list"></div>
+    <button class="more-btn" id="more">Показати ще</button>
+  </main>
+
+  <!-- ВИБІР І КОМБІНАЦІЇ -->
+  <aside class="right">
+    <div class="panel">
+      <h2>Мій вибір</h2>
+      <div class="row">
+        <label class="muted">Треба кредитів: осінь <input type="number" id="t-fall" step="0.5" min="0" style="width:70px"></label>
+        <label class="muted">весна <input type="number" id="t-spring" step="0.5" min="0" style="width:70px"></label>
+      </div>
+      <div id="basket"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Підібрати комбінацію</h2>
+      <div class="muted">Шукає набори курсів, які точно дозбирають потрібні кредити. Кандидати — ★ цікаві (якщо є), інакше поточний відфільтрований список.</div>
+      <div class="row" style="margin-top:8px">
+        <select id="c-sem" style="width:auto"><option value="fall">Осінь</option><option value="spring">Весна</option></select>
+        <label class="muted">до <input type="number" id="c-max" value="3" min="1" max="5" style="width:50px"> курсів</label>
+        <button class="primary" id="c-run">Підібрати</button>
+      </div>
+      <div id="combos"></div>
+    </div>
+  </aside>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
