@@ -177,6 +177,11 @@
           <div class="card-box">
             <label class="lbl" for="ai-wish">Що вам цікаво і чого хочете уникнути</label>
             <textarea id="ai-wish" placeholder="Напр.: цікавлять машинне навчання і стартапи, краще без екзаменів, англійською — теж ок"></textarea>
+            <div class="chips rules" id="ai-rules">
+              <button class="chip" data-rule="nomand" title="Не пропонувати ваші обов’язкові й курси зі схожими назвами">Без обов’язкових і схожих</button>
+              <button class="chip" data-rule="parity" title="Лише курси, що читаються в обраному семестрі (осінь/весна)">Лише ті, що читаються в цьому семестрі</button>
+              <button class="chip" data-rule="year" title="Перевага курсам з рекомендованим роком, що відповідає вашому курсу">Бажано мого року навчання</button>
+            </div>
             <div class="chips" id="ai-quick">${["Без екзаменів", "Без курсових", "Англійською", "Корисне для роботи в IT", "Найменше навантаження", "Пріоритет рекомендованим кафедрою", "Щось зовсім нове для мене"].map(t => `<button class="chip" data-q="${t}">+ ${t}</button>`).join("")}</div>
             <div class="row" style="margin-top:12px">
               <select id="ai-sem" class="pill" aria-label="Семестр"></select>
@@ -633,6 +638,14 @@
       async keyInfo() { const k = store.get("geminiKey", ""); return { hasKey: !!k, hint: k ? "…" + k.slice(-4) : "" }; },
       async setKey(k) { store.set("geminiKey", k || ""); return true; },
     };
+    const aiRules = Object.assign({ nomand: true, parity: true, year: true }, store.get("aiRules", {}));
+    const syncRules = () => root.querySelectorAll("[data-rule]").forEach(b => { b.classList.toggle("on", !!aiRules[b.dataset.rule]); b.setAttribute("aria-pressed", !!aiRules[b.dataset.rule]); });
+    root.querySelectorAll("[data-rule]").forEach(b => b.addEventListener("click", () => {
+      aiRules[b.dataset.rule] = !aiRules[b.dataset.rule]; store.set("aiRules", aiRules); syncRules();
+    }));
+    syncRules();
+    // рік навчання для семестру плану: 5 семестр → 3 курс
+    const studyYear = s => s.num ? Math.ceil(s.num / 2) : null;
     let aiModel = store.get("aiModel", ""), aiModels = store.get("aiModels", []), aiResult = null, aiBusy = false, aiError = "";
     function apiError(res) {
       let msg = res.body;
@@ -706,10 +719,16 @@
 
     function aiPool(s) {
       const takenNames = new Set(basket.map(x => norm(BY_ID.get(x.id)?.name)));
-      let pool = COURSES.filter(c => !inPlan(c) && !siteSelected.has(c.id) && !takenNames.has(norm(c.name)) && parities(c).has(s.parity) && !blockState(c)?.exact);
+      let pool = COURSES.filter(c => !inPlan(c) && !siteSelected.has(c.id) && !takenNames.has(norm(c.name))
+        && (!aiRules.parity || parities(c).has(s.parity))
+        && !blockState(c)?.exact);
       if ($("#ai-filters").checked) pool = pool.filter(c => matches(c, { ignoreSem: true }));
       else if (S.major) pool = pool.filter(c => c.majors.includes(+S.major));   // лише доступні вашій спеціальності
-      return pool.sort(SORTS.smart).slice(0, 260);
+      const y = aiRules.year ? studyYear(s) : null;
+      const yearFirst = (a, b) => y ? (b.year === y) - (a.year === y) : 0;
+      // схожі на обов’язкові — не викидаємо, а ставимо в кінець
+      const similarLast = (a, b) => aiRules.nomand ? !!blockState(a)?.similar - !!blockState(b)?.similar : 0;
+      return pool.sort((a, b) => similarLast(a, b) || yearFirst(a, b) || SORTS.smart(a, b)).slice(0, 260);
     }
     async function runAI() {
       const s = plan.find(p => p.key === $("#ai-sem").value) || plan[0];
@@ -724,15 +743,22 @@
         if (!aiModel) await loadModels();
         const line = c => [c.id, c.name, `кредити: ${c.credit_options.join(" або ")}`, `контроль: ${CONTROL[controlFor(c, s.parity)] || "?"}`,
           `рік: ${c.year || "?"}`, `рейтинг: ${Math.round(c.rating)}`, recommended.has(c.id) ? "РЕКОМЕНДУЄ ВИПУСКОВА КАФЕДРА" : "", stars.has(c.id) ? "студент позначив ★" : "",
-          c.termpaper ? "є курсова" : "", c.lang === "en" ? "мова: англійська" : "", DEP_NAME[c.department] || "", c.objective ? "мета: " + c.objective.slice(0, 170) : ""].filter(Boolean).join(" | ");
+          c.termpaper ? "є курсова" : "", blockState(c)?.similar ? `схоже на обов’язкову «${blockState(c).match}»` : "", c.lang === "en" ? "мова: англійська" : "", DEP_NAME[c.department] || "", c.objective ? "мета: " + c.objective.slice(0, 170) : ""].filter(Boolean).join(" | ");
         const planned = basket.filter(x => x.sem === s.key).map(x => `${BY_ID.get(x.id).name} (${x.credits} кр.)`);
         const mand = (account?.mandatory || []).map(m => m.name).concat(manualMandatory.split("\n").map(t => t.trim()).filter(Boolean));
+        const y = studyYear(s);
+        const rules = [
+          aiRules.nomand && "Уникай курсів з позначкою «схоже на обов’язкову» і тих, що за змістом повторюють обов’язкові; бери їх лише якщо без них не вийде потрібна сума кредитів або вони явно відповідають побажанням.",
+          aiRules.parity && `Пропонуй лише курси, що читаються в цьому семестрі (${s.parity === "fall" ? "осінньому" : "весняному"}) — у переліку саме такі.`,
+          aiRules.year && y && `Студент буде на ${y} курсі: бажано обирати курси з рекомендованим роком навчання ${y}; інші — лише якщо без них не вийде потрібна сума кредитів або вони значно краще підходять.`,
+        ].filter(Boolean);
         const prompt = `Студент ТНТУ обирає вибіркові дисципліни.
 Спеціальність: ${account?.speciality || "не вказано"}.
 Семестр: ${s.label}. Треба добрати рівно ${fmt(need)} кредитів ЄКТС.
 ${planned.length ? `Уже в плані цього семестру: ${planned.join("; ")}.` : ""}
 Обов’язкові дисципліни студента (не пропонуй курси, що дублюють їхній зміст): ${[...new Set(mand)].slice(0, 90).join("; ") || "невідомо"}.
 Побажання студента: ${$("#ai-wish").value.trim() || "немає, обери найкорисніше для спеціальності"}.
+${rules.length ? "Обов’язкові правила:\n- " + rules.join("\n- ") : ""}
 
 Доступні курси (ID | назва | параметри):
 ${pool.map(line).join("\n")}`;

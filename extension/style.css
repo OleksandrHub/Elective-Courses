@@ -291,3 +291,8 @@ summary.pill[data-n]:not([data-n=""])::after { content: attr(data-n); font-size:
 .ai-pick a { text-decoration: none; }
 .ai-cr { font-size: 16px; }
 .el-app #ai-sem { max-width: 100%; }
+.rules { margin-top: 10px; }
+.el-app .rules .chip { border: 1px dashed var(--line); background: none; color: var(--muted); }
+.el-app .rules .chip::before { content: "○ "; }
+.el-app .rules .chip.on { border: 1px solid var(--zalik); background: var(--zalik-soft); color: var(--zalik); }
+.el-app .rules .chip.on::before { content: "✓ "; }
