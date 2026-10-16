@@ -75,6 +75,18 @@ python3 scrape.py          # оновити каталог: extension/courses.js
 
 `scrape.py` кешує силабуси й відповіді фільтрів у `cache/`. Щоб завантажити все наново, видаліть цю папку.
 
+### Поширення
+
+```bash
+python3 package.py           # зібрати app.js і створити dist/vybirkovi-tntu-<версія>.zip
+python3 package.py --icons   # те саме + перегенерувати іконки (потрібен Pillow)
+```
+
+Архів містить лише файли, потрібні розширенню (без `data.js` для `index.html`). Його можна:
+
+- **надіслати іншим.** Вони розпаковують архів, відкривають `chrome://extensions` → «Режим розробника» → «Завантажити розпаковане» і вибирають розпаковану папку;
+- **завантажити в магазин.** Підходять [Chrome Web Store](https://chrome.google.com/webstore/devconsole) (разовий внесок $5) або [Microsoft Edge Add-ons](https://partner.microsoft.com/dashboard/microsoftedge) (безкоштовно). З магазину розширення встановлюється в один клік і оновлюється автоматично; Chrome Web Store працює і в Brave, Opera та Vivaldi.
+
 ### Домовленості
 
 - Документація коду ведеться англійською у форматі JSDoc, а текст інтерфейсу — українською.
