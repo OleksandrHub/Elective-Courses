@@ -22,7 +22,7 @@
     /**
      * Applies a filter change: resets paging, persists, syncs controls and re-renders.
      */
-    const update = () => { page = 1; save(); syncControls(); render(); };
+    const update = () => { page = 1; animateNext.list = true; save(); syncControls(); render(); };
     for (const [k, sel] of Object.entries(selects)) $(sel).addEventListener("change", e => { S[k] = e.target.value; update(); });
     for (const k of ["hideBlocked", "hideSimilar"]) $("#f-" + k).addEventListener("change", e => { S[k] = e.target.checked; update(); });
     // Debounced search input.

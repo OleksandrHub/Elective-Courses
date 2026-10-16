@@ -1,0 +1,59 @@
+/* Motion: entrance animations, hover/press feedback and transitions.
+   Everything here is decorative and is switched off for prefers-reduced-motion. */
+
+/* ===== Keyframes ===== */
+@keyframes el-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes el-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes el-drop { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes el-zoom { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes el-pop { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }
+@keyframes el-bump { 0% { transform: scale(1); } 35% { transform: scale(1.07); } 100% { transform: scale(1); } }
+
+/* ===== Views and lists ===== */
+/* Re-runs whenever a tab becomes visible (display: none -> block). */
+#view-catalog, #view-report, #view-ai { animation: el-fade-in .22s ease-out; }
+/* Catalog cards / table rows: staggered rise, only when #list has .anim (filter or page change). */
+#list.anim .item, #list.anim .tbl tbody tr { animation: el-rise .32s cubic-bezier(.2, .7, .3, 1) both; }
+#list.anim .item:nth-child(2), #list.anim tbody tr:nth-child(2) { animation-delay: .03s; }
+#list.anim .item:nth-child(3), #list.anim tbody tr:nth-child(3) { animation-delay: .06s; }
+#list.anim .item:nth-child(4), #list.anim tbody tr:nth-child(4) { animation-delay: .09s; }
+#list.anim .item:nth-child(5), #list.anim tbody tr:nth-child(5) { animation-delay: .12s; }
+#list.anim .item:nth-child(6), #list.anim tbody tr:nth-child(6) { animation-delay: .15s; }
+#list.anim .item:nth-child(n+7), #list.anim tbody tr:nth-child(n+7) { animation-delay: .18s; }
+/* Report semesters and AI results. */
+#view-report .rsem, #view-report .tiles.summary { animation: el-rise .3s ease-out both; }
+#ai-out.anim .ai-opt { animation: el-rise .35s cubic-bezier(.2, .7, .3, 1) both; }
+#ai-out.anim .ai-opt:nth-child(3) { animation-delay: .08s; }
+#ai-out.anim .ai-opt:nth-child(4) { animation-delay: .16s; }
+.combo { animation: el-rise .25s ease-out both; }
+.ai-wait, .ai-err { animation: el-fade-in .2s ease-out; }
+
+/* ===== Hover and press feedback ===== */
+.item { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.item:hover { transform: translateY(-2px); box-shadow: 0 6px 18px -8px rgba(24, 32, 47, .25); }
+/* Keep the "in plan" ring while hovering a picked card. */
+.item.picked:hover { box-shadow: 0 0 0 1px var(--amber), 0 6px 18px -8px rgba(24, 32, 47, .25); }
+.el-app button, .el-app .pill, .el-app .chip, .el-app summary { transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .1s ease, box-shadow .15s ease; }
+.el-app button:active:not(:disabled), .el-app .pill:active, .el-app summary:active { transform: scale(.96); }
+.el-app .ic.pop, .el-app .star.pop { animation: el-pop .32s ease-out; }
+.el-app .plan-btn.bump { animation: el-bump .35s ease-out; }
+.el-app .tabs button { transition: color .15s ease, border-color .2s ease; }
+.rbar i, .gauge div { transition: width .35s ease; }
+
+/* ===== Overlays ===== */
+.drawer-back:not([hidden]) { animation: el-fade-in .2s ease-out; }
+.drawer { transition: transform .26s cubic-bezier(.2, .7, .3, 1); }
+.modal:not([hidden]) { animation: el-fade-in .18s ease-out; }
+.modal:not([hidden]) .modal-box { animation: el-zoom .24s cubic-bezier(.2, .7, .3, 1); }
+.gate { animation: el-fade-in .25s ease-out; }
+.gate-box { animation: el-zoom .3s cubic-bezier(.2, .7, .3, 1); }
+details.pop[open] > .pop-panel { animation: el-drop .16s ease-out; transform-origin: top; }
+.comparebar:not([hidden]) { animation: el-rise .22s ease-out; }
+.filterbar.open .pills { animation: el-drop .18s ease-out; }
+.item details.more[open] > :not(summary) { animation: el-fade-in .2s ease-out; }
+
+/* ===== Accessibility ===== */
+@media (prefers-reduced-motion: reduce) {
+  .el-app *, .el-app *::before, .el-app *::after { animation: none !important; transition: none !important; }
+  .item:hover { transform: none; }
+}

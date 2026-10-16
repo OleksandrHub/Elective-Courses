@@ -181,6 +181,8 @@
       $("#active").innerHTML = chips.map((c, i) => `<button class="achip" data-i="${i}" title="Прибрати">${esc(c.label)}<span>✕</span></button>`).join("")
         + (chips.length > 1 ? `<button class="link" id="clear-all">Скинути все</button>` : "");
       const shown = res.slice(0, page * PAGE);
+      $("#list").classList.toggle("anim", animateNext.list);
+      animateNext.list = false;
       $("#list").innerHTML = !res.length
         ? `<div class="empty"><div class="big">∅</div><b>Нічого не знайшлось</b><p>Приберіть частину фільтрів${S.star ? " або вимкніть «★ Цікаві»" : ""}.</p></div>`
         : S.view === "table" ? tableHTML(shown) : `<div class="items">${shown.map(itemHTML).join("")}</div>`;
@@ -223,4 +225,6 @@
         else alert("Порівнювати можна до 4 курсів.");
       }
       save(); render();
+      // Feedback on the button that was clicked (the list was re-rendered).
+      if (kind === "star" || kind === "ai") replayAnim(root.querySelector(`#list [data-id="${id}"] [data-act="${kind}"]`), "pop");
     }

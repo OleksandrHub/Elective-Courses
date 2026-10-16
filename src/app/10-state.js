@@ -62,6 +62,24 @@
     const compare = new Set();
     // Catalog page counter and last computed credit combinations.
     let page = 1, lastCombos = [];
+    /**
+     * One-shot flags that let the next render play an entrance animation
+     * (set when the content really changes, not on every re-render after a click).
+     * @type {{list: boolean, ai: boolean}}
+     */
+    const animateNext = { list: true, ai: false };
+    /**
+     * Restarts a one-off CSS animation class on an element (e.g. "pop", "bump").
+     * @param {?Element} el Target element; ignored when null.
+     * @param {string} cls Animation class defined in css/13-motion.css.
+     */
+    function replayAnim(el, cls) {
+      if (!el) return;
+      el.classList.remove(cls);
+      void el.offsetWidth;   // force reflow so the animation restarts
+      el.classList.add(cls);
+      el.addEventListener("animationend", () => el.classList.remove(cls), { once: true });
+    }
 
     /**
      * Default plan: one generic fall and one spring semester without targets.

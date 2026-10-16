@@ -116,6 +116,7 @@ ${pool.map(line).join("\n")}`;
           return { ...o, picks, sum: picks.reduce((a, p) => a + p.credits, 0) };
         }).filter(o => o.picks.length);
         aiResult = { sem: s.key, parity: s.parity, need, model: aiModel, ...out };
+        animateNext.ai = true;
       } catch (e) {
         aiError = e.message || String(e);
       }
@@ -131,6 +132,8 @@ ${pool.map(line).join("\n")}`;
      */
     function renderAIResult() {
       const out = $("#ai-out");
+      out.classList.toggle("anim", animateNext.ai);
+      animateNext.ai = false;
       if (aiBusy) { out.innerHTML = `<div class="card-box ai-wait"><span class="spin"></span>Gemini підбирає курси… зазвичай 5–30 секунд</div>`; return; }
       if (aiError) { out.innerHTML = `<div class="card-box ai-err">${esc(aiError)}</div>`; return; }
       if (!aiResult) { out.innerHTML = ""; return; }

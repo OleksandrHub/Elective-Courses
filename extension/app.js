@@ -259,6 +259,24 @@
     const compare = new Set();
     // Catalog page counter and last computed credit combinations.
     let page = 1, lastCombos = [];
+    /**
+     * One-shot flags that let the next render play an entrance animation
+     * (set when the content really changes, not on every re-render after a click).
+     * @type {{list: boolean, ai: boolean}}
+     */
+    const animateNext = { list: true, ai: false };
+    /**
+     * Restarts a one-off CSS animation class on an element (e.g. "pop", "bump").
+     * @param {?Element} el Target element; ignored when null.
+     * @param {string} cls Animation class defined in css/13-motion.css.
+     */
+    function replayAnim(el, cls) {
+      if (!el) return;
+      el.classList.remove(cls);
+      void el.offsetWidth;   // force reflow so the animation restarts
+      el.classList.add(cls);
+      el.addEventListener("animationend", () => el.classList.remove(cls), { once: true });
+    }
 
     /**
      * Default plan: one generic fall and one spring semester without targets.
@@ -565,7 +583,7 @@
     /**
      * Applies a filter change: resets paging, persists, syncs controls and re-renders.
      */
-    const update = () => { page = 1; save(); syncControls(); render(); };
+    const update = () => { page = 1; animateNext.list = true; save(); syncControls(); render(); };
     for (const [k, sel] of Object.entries(selects)) $(sel).addEventListener("change", e => { S[k] = e.target.value; update(); });
     for (const k of ["hideBlocked", "hideSimilar"]) $("#f-" + k).addEventListener("change", e => { S[k] = e.target.checked; update(); });
     // Debounced search input.
@@ -803,6 +821,8 @@
       $("#active").innerHTML = chips.map((c, i) => `<button class="achip" data-i="${i}" title="Прибрати">${esc(c.label)}<span>✕</span></button>`).join("")
         + (chips.length > 1 ? `<button class="link" id="clear-all">Скинути все</button>` : "");
       const shown = res.slice(0, page * PAGE);
+      $("#list").classList.toggle("anim", animateNext.list);
+      animateNext.list = false;
       $("#list").innerHTML = !res.length
         ? `<div class="empty"><div class="big">∅</div><b>Нічого не знайшлось</b><p>Приберіть частину фільтрів${S.star ? " або вимкніть «★ Цікаві»" : ""}.</p></div>`
         : S.view === "table" ? tableHTML(shown) : `<div class="items">${shown.map(itemHTML).join("")}</div>`;
@@ -845,6 +865,8 @@
         else alert("Порівнювати можна до 4 курсів.");
       }
       save(); render();
+      // Feedback on the button that was clicked (the list was re-rendered).
+      if (kind === "star" || kind === "ai") replayAnim(root.querySelector(`#list [data-id="${id}"] [data-act="${kind}"]`), "pop");
     }
 
     // ---------- Plan ----------
@@ -870,6 +892,7 @@
       if (i >= 0) basket.splice(i, 1);
       else { const c = BY_ID.get(id); basket.push({ id, credits: credits ?? c.credits, sem: sem ?? planFor(c) }); }
       save();
+      replayAnim($("#plan-btn"), "bump");
     }
     /**
      * Total credits planned in the active basket for one plan semester.
@@ -1683,6 +1706,7 @@ ${pool.map(line).join("\n")}`;
           return { ...o, picks, sum: picks.reduce((a, p) => a + p.credits, 0) };
         }).filter(o => o.picks.length);
         aiResult = { sem: s.key, parity: s.parity, need, model: aiModel, ...out };
+        animateNext.ai = true;
       } catch (e) {
         aiError = e.message || String(e);
       }
@@ -1698,6 +1722,8 @@ ${pool.map(line).join("\n")}`;
      */
     function renderAIResult() {
       const out = $("#ai-out");
+      out.classList.toggle("anim", animateNext.ai);
+      animateNext.ai = false;
       if (aiBusy) { out.innerHTML = `<div class="card-box ai-wait"><span class="spin"></span>Gemini підбирає курси… зазвичай 5–30 секунд</div>`; return; }
       if (aiError) { out.innerHTML = `<div class="card-box ai-err">${esc(aiError)}</div>`; return; }
       if (!aiResult) { out.innerHTML = ""; return; }

@@ -21,6 +21,7 @@
       if (i >= 0) basket.splice(i, 1);
       else { const c = BY_ID.get(id); basket.push({ id, credits: credits ?? c.credits, sem: sem ?? planFor(c) }); }
       save();
+      replayAnim($("#plan-btn"), "bump");
     }
     /**
      * Total credits planned in the active basket for one plan semester.
