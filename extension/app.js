@@ -36,6 +36,7 @@
     root.classList.add("el-app");
     const $ = s => root.querySelector(s);
     const store = makeStore("tntuel_");
+    root.dataset.theme = store.get("theme", "tntu");
     const COURSES = D.courses;
     const BY_ID = new Map(COURSES.map(c => [c.id, c]));
     const BY_SID = new Map(COURSES.map(c => [c.sid, c]));
@@ -135,6 +136,10 @@
         </nav>
         <div class="top-right">
           <div id="account" class="account"></div>
+          <select id="theme" class="theme-sel" aria-label="Тема оформлення" title="Тема оформлення">
+            <option value="tntu">Тема: ТНТУ</option><option value="classic">Тема: класична</option>
+            <option value="dark">Тема: темна</option><option value="auto">Тема: як у системі</option>
+          </select>
           <button id="plan-btn" class="plan-btn" title="Мій план і підбір комбінацій"></button>
           ${env.close ? `<button id="close" class="ghost-ink" title="Закрити (Esc)">✕</button>` : ""}
         </div>
@@ -277,6 +282,8 @@
       rebuildAccount(); render();
     });
     if (env.close) $("#close").addEventListener("click", env.close);
+    $("#theme").value = root.dataset.theme;
+    $("#theme").addEventListener("change", e => { root.dataset.theme = e.target.value; store.set("theme", e.target.value); });
 
     // ---------- шухляда плану ----------
     const openDrawer = (v = true) => { $("#drawer").classList.toggle("open", v); $("#drawer-back").hidden = !v; };
