@@ -48,6 +48,7 @@
     const S = Object.assign({}, DEFAULTS, store.get("filters2", {}));
     let tab = "catalog", reportSem = store.get("reportSem", "plan");
     let stars = new Set(store.get("stars", []));
+    let aiList = new Set(store.get("aiList", []));     // список кандидатів для ШІ; осінь/весна — за тим, коли курс читається
     let basket = store.get("basket", []);              // [{id, credits, sem: planKey}]
     let account = store.get("account", null);
     let accountState = env.live ? "loading" : "off";
@@ -64,7 +65,7 @@
       return [{ key: "fall", label: "Осінній семестр", short: "Осінь", parity: "fall", target: "" },
               { key: "spring", label: "Весняний семестр", short: "Весна", parity: "spring", target: "" }];
     }
-    const save = () => { store.set("filters2", S); store.set("stars", [...stars]); store.set("basket", basket); store.set("plan", plan); };
+    const save = () => { store.set("filters2", S); store.set("stars", [...stars]); store.set("aiList", [...aiList]); store.set("basket", basket); store.set("plan", plan); };
 
     // ---------- дані акаунта ----------
     let mandatoryIds = new Set(), mandatoryNames = [], siteSelected = new Map(), recommended = new Set();
@@ -166,6 +167,7 @@
         </div>
         <div class="resultbar">
           <span class="count" id="count"></span>
+          <button class="pill quiet" id="all-to-ai" title="Додати всі знайдені курси до списку для ШІ">✨ Знайдені → ШІ</button>
           <div id="active" class="active-chips"></div>
           <span class="spacer"></span>
           <select id="sort" class="pill quiet" aria-label="Сортування">
@@ -185,6 +187,12 @@
           <div class="report-head"><div><h1>✨ ШІ-підбір</h1>
             <p class="hint">Gemini з вашого Google-акаунта переглядає доступні курси, ваші обов’язкові й побажання та пропонує набори, що закривають кредити семестру.</p></div></div>
           <div class="card-box" id="ai-key"></div>
+          <div class="card-box">
+            <div class="row"><b>Мій список для ШІ</b><span class="spacer"></span>
+              <label class="check" style="margin:0"><input type="checkbox" id="ai-uselist"> Підбирати лише з мого списку</label></div>
+            <p class="hint" style="margin:4px 0 10px">Додавайте курси кнопкою ✨ у каталозі. Вони самі розходяться по семестрах за тим, коли читаються; курс, що читається і восени, і навесні, буде в обох.</p>
+            <div class="ai-lists" id="ai-lists"></div>
+          </div>
           <div class="card-box">
             <label class="lbl" for="ai-wish">Що вам цікаво і чого хочете уникнути</label>
             <textarea id="ai-wish" placeholder="Напр.: цікавлять машинне навчання і стартапи, краще без екзаменів, англійською — теж ок"></textarea>
@@ -357,6 +365,7 @@
         <div class="score" title="Рейтинг на сайті"><b>${Math.round(c.rating)}</b><small>рейтинг</small></div>
         <div class="acts">
           <button class="ic star ${stars.has(c.id) ? "on" : ""}" data-act="star" title="Цікавить" aria-pressed="${stars.has(c.id)}">${stars.has(c.id) ? "★" : "☆"}</button>
+          <button class="ic ai ${aiList.has(c.id) ? "on" : ""}" data-act="ai" title="${aiList.has(c.id) ? "Прибрати зі списку для ШІ" : `До списку для ШІ (${parityLabel(c)})`}" aria-pressed="${aiList.has(c.id)}">✨</button>
           <button class="ic ${compare.has(c.id) ? "on" : ""}" data-act="cmp" title="Порівняти">⇄</button>
           <button class="add ${inPlan(c) ? "on" : ""}" data-act="add">${inPlan(c) ? "✓ У плані" : "+ План"}</button>
         </div>
@@ -372,7 +381,7 @@
           <td>${(c.controls || []).map(k => `<span class="ctl ${ctlClass(k)}">${CONTROL[k]}</span>`).join(" ")}</td>
           <td class="num">${c.year || "?"}</td><td>${parityLabel(c)}</td><td class="num">${Math.round(c.rating)}</td>
           <td>${esc(c.lecturer)}</td>
-          <td class="nowrap"><button class="ic ${compare.has(c.id) ? "on" : ""}" data-act="cmp" title="Порівняти">⇄</button> <button class="add ${inPlan(c) ? "on" : ""}" data-act="add">${inPlan(c) ? "✓" : "+ План"}</button></td>
+          <td class="nowrap"><button class="ic ai ${aiList.has(c.id) ? "on" : ""}" data-act="ai" title="До списку для ШІ" aria-pressed="${aiList.has(c.id)}">✨</button> <button class="ic ${compare.has(c.id) ? "on" : ""}" data-act="cmp" title="Порівняти">⇄</button> <button class="add ${inPlan(c) ? "on" : ""}" data-act="add">${inPlan(c) ? "✓" : "+ План"}</button></td>
         </tr>`).join("")}</tbody></table></div>`;
     }
 
@@ -403,12 +412,18 @@
       activeChips()[+b.dataset.i].clear(); update();
     });
     $("#more").addEventListener("click", () => { page++; render(); });
+    $("#all-to-ai").addEventListener("click", () => {
+      const res = COURSES.filter(c => matches(c));
+      if (res.length > 40 && !confirm(`Додати до списку для ШІ ${res.length} курсів? Краще спершу звузити фільтрами.`)) return;
+      res.forEach(c => aiList.add(c.id)); save(); render();
+    });
     $("#list").addEventListener("click", e => {
       const btn = e.target.closest("button[data-act]"); if (!btn) return;
       act(btn.dataset.act, +btn.closest("[data-id]").dataset.id);
     });
     function act(kind, id) {
       if (kind === "star") stars.has(id) ? stars.delete(id) : stars.add(id);
+      if (kind === "ai") aiList.has(id) ? aiList.delete(id) : aiList.add(id);
       if (kind === "add") toggleBasket(id);
       if (kind === "cmp") {
         if (compare.has(id)) compare.delete(id);
@@ -765,11 +780,38 @@
         return `<option value="${p.key}">${esc(p.label)}${t ? ` — бракує ${fmt(Math.max(0, left))} кр.` : ""}</option>`; }).join("");
       if (plan.some(p => p.key === cur)) $("#ai-sem").value = cur;
       renderAIKey();
+      renderAILists();
       renderAIResult();
     }
+    const listFor = parity => [...aiList].map(id => BY_ID.get(id)).filter(c => c && parities(c).has(parity)).sort(SORTS.smart);
+    $("#ai-uselist").checked = store.get("aiUseList", true);
+    $("#ai-uselist").addEventListener("change", e => store.set("aiUseList", e.target.checked));
+    function renderAILists() {
+      const sel = plan.find(p => p.key === $("#ai-sem").value);
+      $("#ai-lists").innerHTML = ["fall", "spring"].map(par => {
+        const items = listFor(par), sum = items.reduce((a, c) => a + c.credits, 0);
+        return `<div class="ai-list ${sel?.parity === par ? "active" : ""}">
+          <div class="ai-list-head"><b>${par === "fall" ? "Осінь" : "Весна"}</b><span class="hint">${items.length} курс. · від ${fmt(sum)} кр.</span></div>
+          ${items.map(c => `<div class="ai-li"><span class="ctl ${ctlClass(controlFor(c, par))}">${CONTROL_SHORT[controlFor(c, par)] || "?"}</span>
+            <a href="${syllabusUrl(c)}" target="_blank" rel="noopener">${esc(c.name)}</a><b>${c.credit_options.join("/")}</b>
+            <button class="ghost" data-ai-rm="${c.id}" title="Прибрати">✕</button></div>`).join("") || `<p class="hint">Порожньо — тоді ШІ обирає з усіх доступних курсів.</p>`}
+        </div>`;
+      }).join("") + (aiList.size ? `<div class="row"><button class="ghost" id="ai-list-clear">Очистити список</button></div>` : "");
+    }
+    $("#ai-lists").addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.aiRm) aiList.delete(+b.dataset.aiRm);
+      if (b.id === "ai-list-clear" && !confirm("Очистити список для ШІ?")) return;
+      if (b.id === "ai-list-clear") aiList.clear();
+      save(); renderAILists();
+    });
+    $("#ai-sem").addEventListener("change", renderAILists);
 
+    const usingList = s => $("#ai-uselist").checked && listFor(s.parity).length > 0;
     function aiPool(s) {
       const takenNames = new Set(basket.map(x => norm(BY_ID.get(x.id)?.name)));
+      if (usingList(s))   // свій список: лише курси цього семестру (осінь/весна), без уже обраних і вивчених
+        return listFor(s.parity).filter(c => !inPlan(c) && !siteSelected.has(c.id) && !takenNames.has(norm(c.name)) && !blockState(c)?.exact);
       let pool = COURSES.filter(c => !inPlan(c) && !siteSelected.has(c.id) && !takenNames.has(norm(c.name))
         && (!aiRules.parity || parities(c).has(s.parity))
         && !blockState(c)?.exact);
@@ -788,7 +830,7 @@
       if (!target) { aiError = "Спершу вкажіть у «План» ліміт кредитів для цього семестру."; aiResult = null; return renderAIResult(); }
       if (need <= 0) { aiError = `У цьому семестрі вже набрано ${fmt(have)} з ${fmt(target)} кр.`; aiResult = null; return renderAIResult(); }
       const pool = aiPool(s);
-      if (!pool.length) { aiError = "Немає доступних курсів для цього семестру — послабте фільтри."; aiResult = null; return renderAIResult(); }
+      if (!pool.length) { aiError = usingList(s) ? "У вашому списку для ШІ на цей семестр усі курси вже в плані або вивчені — додайте ще кнопкою ✨." : "Немає доступних курсів для цього семестру — послабте фільтри."; aiResult = null; return renderAIResult(); }
       aiBusy = true; aiError = ""; aiResult = null; $("#ai-run").disabled = true; renderAIResult();
       try {
         if (!aiModel) await loadModels();
@@ -811,7 +853,7 @@ ${planned.length ? `Уже в плані цього семестру: ${planned.
 Побажання студента: ${$("#ai-wish").value.trim() || "немає, обери найкорисніше для спеціальності"}.
 ${rules.length ? "Обов’язкові правила:\n- " + rules.join("\n- ") : ""}
 
-Доступні курси (ID | назва | параметри):
+${usingList(s) ? "Студент сам відібрав ці курси для цього семестру — обирай лише з них.\n" : ""}Доступні курси (ID | назва | параметри):
 ${pool.map(line).join("\n")}`;
         const body = {
           systemInstruction: { parts: [{ text: `Ти — академічний радник. Запропонуй 3 різні варіанти наборів вибіркових дисциплін.

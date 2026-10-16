@@ -301,3 +301,14 @@ summary.pill[data-n]:not([data-n=""])::after { content: attr(data-n); font-size:
 .type.prac { background: var(--sunken); color: var(--muted); }
 .tbl td.grade { white-space: nowrap; font-weight: 600; }
 .rsem.past h2 { color: var(--muted); }
+.el-app .ic.ai.on { background: var(--rec-soft); color: var(--rec); }
+.ai-lists { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ai-list { background: var(--sunken); border-radius: 12px; padding: 10px 12px; border: 2px solid transparent; }
+.ai-list.active { border-color: var(--amber); }
+.ai-list-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.ai-li { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 28px; gap: 8px; align-items: center; padding: 5px 0; font-size: 13px; border-top: 1px solid var(--line); }
+.ai-li .ctl { justify-content: center; padding: 1px 0; }
+.ai-li a { text-decoration: none; }
+.el-app .ai-li .ghost { padding: 0 6px; }
+.ai-lists .row { grid-column: 1 / -1; }
+@media (max-width: 760px) { .ai-lists { grid-template-columns: 1fr; } }
