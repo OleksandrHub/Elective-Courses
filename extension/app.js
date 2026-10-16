@@ -251,6 +251,17 @@
         </div>
       </aside>
 
+      <footer class="foot">
+        <div>© 2026 <a href="https://github.com/OleksandrHub" target="_blank" rel="noopener">Олександр Кліщ</a>. Усі авторські права належать автору.</div>
+        <div class="foot-links">
+          <a href="https://github.com/OleksandrHub" target="_blank" rel="noopener">GitHub · OleksandrHub</a>
+          <button class="link" data-doc="license">Ліцензія MIT</button>
+          <button class="link" data-doc="terms">Умови користування</button>
+          ${env.version ? `<span>v${esc(env.version)}</span>` : ""}
+        </div>
+        <div class="foot-note">Неофіційний інструмент, не пов’язаний з ТНТУ. Перед поданням заяви перевіряйте дані на dl.tntu.edu.ua.</div>
+      </footer>
+
       <div id="comparebar" class="comparebar" hidden></div>
       <div id="modal" class="modal" hidden><div class="modal-box" role="dialog" aria-modal="true"><button class="ghost modal-x" title="Закрити">✕</button><div id="modal-body"></div></div></div>`;
 
@@ -1037,6 +1048,34 @@ ${pool.map(line).join("\n")}`;
         inPlan(BY_ID.get(p.id)) ? toggleBasket(p.id) : add(p);
       }
       render();
+    });
+
+    // ---------- ліцензія й умови ----------
+    const DOCS = {
+      license: `<h2>Ліцензія MIT</h2>
+        <p>© 2026 Олександр Кліщ (<a href="https://github.com/OleksandrHub" target="_blank" rel="noopener">OleksandrHub</a>). Авторські права належать автору.</p>
+        <p>Дозволяється безкоштовно користуватися, копіювати, змінювати, об’єднувати, публікувати, поширювати, субліцензувати та продавати копії програми за умови, що в усіх копіях або значущих частинах збережено це повідомлення про авторські права та дозвіл.</p>
+        <p>Програма надається «як є», без жодних гарантій, явних чи неявних. Автор не несе відповідальності за будь-які претензії, збитки чи інші наслідки використання програми.</p>
+        <p class="hint">Повний офіційний текст англійською — у файлі LICENSE поруч з розширенням.</p>`,
+      terms: `<h2>Умови користування</h2>
+        <p class="hint">Чинні з 17.10.2026 · автор Олександр Кліщ</p>
+        <h3>1. Що це</h3><p>Неофіційний допоміжний інструмент для пошуку й порівняння вибіркових дисциплін на dl.tntu.edu.ua. <b>Не є продуктом ТНТУ</b> і не пов’язаний з університетом.</p>
+        <h3>2. Ваші дані</h3><ul>
+          <li>Розширення читає сторінки сайту у вашій уже відкритій сесії (обов’язкові, «Обрані мною», «Мене цікавлять», навчальний план). Логін і пароль воно не бачить і не зберігає.</li>
+          <li>План, варіанти, ★ і налаштування зберігаються <b>лише у вашому браузері</b>. Автор їх не отримує.</li>
+          <li>Розширення <b>нічого не змінює</b> у вашому акаунті й не подає заяв від вашого імені.</li></ul>
+        <h3>3. ШІ-підбір (Gemini)</h3><ul>
+          <li>Працює лише з вашим власним API-ключем Gemini, який зберігається у вашому браузері.</li>
+          <li>У Google надсилаються: спеціальність, назви обов’язкових і вивчених дисциплін, побажання і перелік курсів. Оцінки, ПІБ, логін і пароль — ні.</li>
+          <li>Запити обробляє Google за <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">умовами Gemini API</a>. Відповіді ШІ можуть бути неточними.</li></ul>
+        <h3>4. Без гарантій</h3><p>Дані про курси беруться з силабусів і сторінок сайту та можуть бути застарілими. <b>Перед поданням заяви перевіряйте все на dl.tntu.edu.ua і в деканаті.</b> Остаточний вибір, строки й правильність заяви — ваша відповідальність. Інструмент надається «як є».</p>
+        <h3>5. Допустиме використання</h3><p>Користуйтеся лише зі своїм акаунтом і за правилами dl.tntu.edu.ua, без масових автоматичних запитів до сайту.</p>
+        <h3>6. Ліцензія та контакти</h3><p>Код поширюється за ліцензією MIT. Питання й пропозиції — на <a href="https://github.com/OleksandrHub" target="_blank" rel="noopener">github.com/OleksandrHub</a>.</p>`,
+    };
+    root.querySelector(".foot").addEventListener("click", e => {
+      const d = e.target.closest("[data-doc]"); if (!d) return;
+      $("#modal-body").innerHTML = `<div class="doc">${DOCS[d.dataset.doc]}</div>`;
+      $("#modal").hidden = false;
     });
 
     // ---------- порівняння ----------

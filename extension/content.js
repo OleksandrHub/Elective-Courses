@@ -253,7 +253,7 @@
     document.body.appendChild(host);
     try {
       const data = await fetch(chrome.runtime.getURL("courses.json")).then(r => r.json());
-      window.ElectivesApp.mount(app, data, { live: true, loadAccount, close, gemini });
+      window.ElectivesApp.mount(app, data, { live: true, loadAccount, close, gemini, version: chrome.runtime.getManifest().version });
     } catch (e) {
       app.innerHTML = `<div class="loading">Не вдалося завантажити дані: ${e.message}</div>`;
     }
