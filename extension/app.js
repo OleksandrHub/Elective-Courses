@@ -50,7 +50,12 @@
     let tab = "catalog", reportSem = store.get("reportSem", "plan");
     let stars = new Set(store.get("stars", []));
     let aiList = new Set(store.get("aiList", []));     // список кандидатів для ШІ; осінь/весна — за тим, коли курс читається
-    let basket = store.get("basket", []);              // [{id, credits, sem: planKey}]
+    // Варіанти плану: у кожного свій набір курсів, ліміти семестрів спільні
+    let variants = store.get("variants", null) || [{ id: "v1", name: "План A", basket: store.get("basket", []) }];
+    let activeVariant = store.get("activeVariant", variants[0].id);
+    if (!variants.some(v => v.id === activeVariant)) activeVariant = variants[0].id;
+    const curVariant = () => variants.find(v => v.id === activeVariant);
+    let basket = curVariant().basket;                  // [{id, credits, sem: planKey}] активного варіанта
     let account = store.get("account", null);
     let accountState = env.live ? "loading" : "off";
     let accountError = "";
@@ -66,7 +71,19 @@
       return [{ key: "fall", label: "Осінній семестр", short: "Осінь", parity: "fall", target: "" },
               { key: "spring", label: "Весняний семестр", short: "Весна", parity: "spring", target: "" }];
     }
-    const save = () => { store.set("filters2", S); store.set("stars", [...stars]); store.set("aiList", [...aiList]); store.set("basket", basket); store.set("plan", plan); };
+    const save = () => { store.set("filters2", S); store.set("stars", [...stars]); store.set("aiList", [...aiList]); store.set("plan", plan);
+      curVariant().basket = basket; store.set("variants", variants); store.set("activeVariant", activeVariant); };
+    function nextVariantName() {
+      const used = new Set(variants.map(v => v.name));
+      return [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map(l => "План " + l).find(n => !used.has(n)) || `План ${variants.length + 1}`;
+    }
+    function switchVariant(id) { save(); activeVariant = id; basket = curVariant().basket; save(); $("#combos").innerHTML = ""; render(); }
+    function newVariant(items = [], name = nextVariantName()) {
+      save();
+      const v = { id: "v" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name, basket: items.map(x => ({ ...x })) };
+      variants.push(v); activeVariant = v.id; basket = v.basket; save(); render();
+      return v;
+    }
 
     // ---------- дані акаунта ----------
     let mandatoryIds = new Set(), mandatoryNames = [], siteSelected = new Map(), recommended = new Set();
@@ -453,14 +470,20 @@
     }
     const planSum = s => basket.filter(x => x.sem === s.key).reduce((a, x) => a + x.credits, 0);
     function renderPlanBtn() {
-      $("#plan-btn").innerHTML = `<span class="pb-title">План</span>` + plan.map(s => {
+      $("#plan-btn").innerHTML = `<span class="pb-title">${esc(variants.length > 1 ? curVariant().name : "План")}</span>` + plan.map(s => {
         const sum = planSum(s), t = +s.target || 0;
         const st = !t ? "" : sum === t ? "full" : sum > t ? "over" : "";
         return `<span class="pb-sem ${st}"><i>${esc(s.short)}</i>${fmt(sum)}${t ? "/" + fmt(t) : ""}</span>`;
       }).join("");
     }
     function renderPlan() {
-      let html = account?.plan?.length ? `<p class="hint">Ліміти — скільки ще лишилось набрати за вкладкою «${esc(account.selectedTitle || "Обрані мною")}».</p>` : "";
+      let html = `<div class="variants">
+        <div class="vtabs">${variants.map(v => `<button class="vtab ${v.id === activeVariant ? "on" : ""}" data-vsel="${v.id}">${esc(v.name)}<small>${v.basket.length}</small></button>`).join("")}
+          <button class="vtab add" data-vnew="empty" title="Новий порожній варіант">+ Новий</button></div>
+        <div class="vactions"><button class="link" data-vact="dup">Дублювати</button><button class="link" data-vact="rename">Перейменувати</button>${variants.length > 1 ? `<button class="link" data-vact="del">Видалити</button>` : ""}</div>
+      </div>`;
+      if (variants.length > 1) html += variantsCompareHTML();
+      html += account?.plan?.length ? `<p class="hint">Ліміти — скільки ще лишилось набрати за вкладкою «${esc(account.selectedTitle || "Обрані мною")}». Вони спільні для всіх варіантів.</p>` : "";
       for (const s of plan) {
         const items = basket.filter(x => x.sem === s.key);
         const sum = planSum(s), t = +s.target || 0;
@@ -502,11 +525,35 @@
       if (e.target.dataset.pact === "sem") x.sem = e.target.value;
       save(); render();
     });
+    function variantsCompareHTML() {
+      const stat = (v, s) => {
+        const items = v.basket.filter(x => x.sem === s.key);
+        const sum = items.reduce((a, x) => a + x.credits, 0);
+        const exams = items.filter(x => { const c = BY_ID.get(x.id); return c && controlFor(c, s.parity) === "exam"; }).length;
+        const t = +s.target || 0;
+        return `<td class="${t && sum === t ? "ok-text" : t && sum > t ? "bad-text" : ""}"><b>${fmt(sum)}${t ? "/" + fmt(t) : ""}</b> <span class="hint">${exams} екз</span></td>`;
+      };
+      return `<div class="vcmp"><table class="tbl"><thead><tr><th>Варіант</th>${plan.map(s => `<th>${esc(s.short)}</th>`).join("")}</tr></thead>
+        <tbody>${variants.map(v => `<tr class="${v.id === activeVariant ? "picked" : ""}" data-vrow="${v.id}"><td><button class="link" data-vsel="${v.id}">${esc(v.name)}</button></td>${plan.map(s => stat(v, s)).join("")}</tr>`).join("")}</tbody></table></div>`;
+    }
     $("#plan").addEventListener("click", e => {
       const t = e.target.closest("button"); if (!t) return;
+      if (t.dataset.vsel) { switchVariant(t.dataset.vsel); return; }
+      if (t.dataset.vnew) { newVariant(); return; }
+      if (t.dataset.vact === "dup") { newVariant(basket, curVariant().name + " (копія)"); return; }
+      if (t.dataset.vact === "rename") {
+        const name = prompt("Назва варіанта:", curVariant().name);
+        if (name?.trim()) { curVariant().name = name.trim().slice(0, 40); save(); render(); }
+        return;
+      }
+      if (t.dataset.vact === "del" && confirm(`Видалити варіант «${curVariant().name}»?`)) {
+        variants = variants.filter(v => v.id !== activeVariant);
+        activeVariant = variants[0].id; basket = curVariant().basket; save(); render();
+        return;
+      }
       if (t.dataset.pact === "rm") { toggleBasket(+t.closest(".pitem").dataset.id); render(); }
       if (t.id === "copy") {
-        const txt = plan.map(p => `${p.label}:\n` + basket.filter(x => x.sem === p.key).map(x => {
+        const txt = `${curVariant().name}\n` + plan.map(p => `${p.label}:\n` + basket.filter(x => x.sem === p.key).map(x => {
           const c = BY_ID.get(x.id); return `  ${c.id} — ${c.name} (${x.credits} кр., ${CONTROL[controlFor(c, p.parity)] || "?"}, ${c.lecturer})`;
         }).join("\n")).join("\n");
         navigator.clipboard.writeText(txt).then(() => { t.textContent = "Скопійовано ✓"; });
@@ -549,13 +596,18 @@
       out.innerHTML = `<p class="hint">Треба ${fmt(need)} кр. · кандидатів ${pool.length} (${fromStars ? "★ цікаві" : "з фільтрів"}) · знайдено ${results.length}${results.length > 4000 ? "+" : ""}</p>` +
         (lastCombos.length ? lastCombos.map((r, i) => `<div class="combo">
           <ul>${r.map(x => `<li><span class="ctl ${ctlClass(controlFor(x.c, s.parity))}">${CONTROL_SHORT[controlFor(x.c, s.parity)] || "?"}</span><span>${esc(x.c.name)}${recommended.has(x.c.id) ? " 🎓" : ""}</span><b>${x.v}</b></li>`).join("")}</ul>
-          <button data-combo="${i}">+ Додати набір</button></div>`).join("")
+          <div class="row"><button data-combo="${i}">+ Додати набір</button><button class="ghost" data-combo-new="${i}" title="Створити новий варіант плану з поточних курсів і цього набору">Як новий варіант</button></div></div>`).join("")
           : `<p class="hint">Точної комбінації немає. Дозвольте більше курсів у наборі, позначте більше ★ або послабте фільтри.</p>`);
     }
     $("#c-run").addEventListener("click", runCombos);
     $("#combos").addEventListener("click", e => {
-      const i = e.target.dataset.combo; if (i == null) return;
       const sem = $("#c-sem").value;
+      const k = e.target.dataset.comboNew;
+      if (k != null) {
+        newVariant([...basket, ...lastCombos[k].filter(x => !basket.some(b => b.id === x.c.id)).map(x => ({ id: x.c.id, credits: x.v, sem }))]);
+        runCombos(); return;
+      }
+      const i = e.target.dataset.combo; if (i == null) return;
       for (const x of lastCombos[i]) if (!basket.some(b => b.id === x.c.id)) toggleBasket(x.c.id, x.v, sem);
       render(); runCombos();
     });
@@ -638,6 +690,7 @@
       $("#view-report").innerHTML = `
         <div class="report-head">
           <div><h1>Звіт по семестрах</h1>
+            ${variants.length > 1 ? `<div class="vtabs" style="margin:6px 0 4px">${variants.map(v => `<button class="vtab ${v.id === activeVariant ? "on" : ""}" data-vsel="${v.id}">${esc(v.name)}</button>`).join("")}</div>` : ""}
             <p class="hint">${st ? `${esc(st.speciality)} · ${st.courseYear || "?"} курс, група ${esc(st.group)}${st.planName ? ` · план ${esc(st.planName)}` : ""}. Дані з «Індивідуального навчального плану», вкладок вибіркових і вашого плану.`
               : account ? "Обов’язкові — з вашого акаунта, вибіркові — з плану і вкладки «Обрані мною»." : "Тут лише вибіркові з плану. Через розширення на dl.tntu.edu.ua сюди додаються дані з акаунта."}</p></div>
           <div class="row"><button id="rep-copy">Копіювати для Excel</button><button id="rep-print">Друк</button></div>
@@ -675,6 +728,7 @@
     $("#view-report").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.rsem) { reportSem = b.dataset.rsem; store.set("reportSem", reportSem); render(); }
+      if (b.dataset.vsel) { switchVariant(b.dataset.vsel); return; }
       const blocks = window.__elReport || [];
       if (b.id === "rep-copy") {
         const lines = ["Семестр\tДисципліна\tТип\tКредити\tКонтроль\tКурсова\tОцінка"];
@@ -925,7 +979,7 @@ ${pool.map(line).join("\n")}`;
                 <b class="ai-cr">${p.credits}</b>
                 <button class="ic ${added ? "on" : ""}" data-ai-pick="${i}:${j}" title="${added ? "У плані" : "Додати в план"}">${added ? "✓" : "+"}</button>
               </div>`; }).join("")}
-            <div class="row" style="margin-top:10px"><button class="add ${allIn ? "on" : ""}" data-ai-add="${i}" ${allIn ? "disabled" : ""}>${allIn ? "✓ Набір у плані" : "+ Додати весь набір"}</button></div>
+            <div class="row" style="margin-top:10px"><button class="add ${allIn ? "on" : ""}" data-ai-add="${i}" ${allIn ? "disabled" : ""}>${allIn ? "✓ Набір у плані" : "+ Додати весь набір"}</button><button class="ghost" data-ai-variant="${i}" title="Новий варіант плану: поточні курси + цей набір">Як новий варіант</button></div>
           </article>`;
         }).join("") : `<div class="card-box">Gemini не запропонував коректних варіантів. Спробуйте ще раз або змініть побажання.</div>`}
         <p class="hint">Модель: ${esc(r.model)}. ШІ може помилятись — перевіряйте силабуси перед заявою.</p>`;
@@ -934,6 +988,12 @@ ${pool.map(line).join("\n")}`;
       const b = e.target.closest("button"); if (!b || !aiResult) return;
       const add = p => { const c = BY_ID.get(p.id); if (c && !inPlan(c)) toggleBasket(c.id, p.credits, aiResult.sem); };
       if (b.dataset.aiAdd != null) aiResult.options[+b.dataset.aiAdd].picks.forEach(add);
+      if (b.dataset.aiVariant != null) {
+        const o = aiResult.options[+b.dataset.aiVariant];
+        newVariant([...basket, ...o.picks.filter(p => !basket.some(x => x.id === p.id)).map(p => ({ id: p.id, credits: p.credits, sem: aiResult.sem }))],
+          `ШІ: ${o.title}`.slice(0, 40));
+        return;
+      }
       if (b.dataset.aiPick) {
         const [i, j] = b.dataset.aiPick.split(":").map(Number), p = aiResult.options[i].picks[j];
         inPlan(BY_ID.get(p.id)) ? toggleBasket(p.id) : add(p);
