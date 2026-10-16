@@ -1,6 +1,6 @@
 /* Course catalogue: course list items, badges, actions and data tables. */
 /* ===== Course list ===== */
-.content { max-width: 1180px; margin: 0 auto; padding: 10px 22px 90px; }
+.content { max-width: var(--content-w); margin: 0 auto; padding: 10px 22px 90px; }
 .items { display: flex; flex-direction: column; gap: 8px; }
 .item { position: relative; display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 16px; align-items: start;
   background: var(--surface); border-radius: var(--radius); padding: 14px 16px 14px 20px; box-shadow: var(--shadow); border: 1px solid transparent; }
@@ -77,3 +77,9 @@
 .tbl.cmp th { white-space: nowrap; }
 .tbl.cmp tbody th { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; vertical-align: top; }
 .tbl.cmp td { min-width: 220px; vertical-align: top; }
+
+/* Very wide screens: two card columns so lines stay readable while the space is used. */
+@media (min-width: 1760px) {
+  .el-app { --content-w: 1720px; }
+  .items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+}
