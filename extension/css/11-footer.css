@@ -1,10 +1,10 @@
 /* Page footer (links, note) and text documents shown in modals (.doc). */
 /* ===== Footer and documents ===== */
 /* Always spans the full window width, unlike the content column. */
-.foot { max-width: none; margin: 10px 0 0; padding: 22px 22px 100px; background: var(--surface); border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; display: grid; gap: 6px; }
+.foot { max-width: none; margin: 10px 0 0; padding: 22px 22px 100px; background: var(--surface); border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; display: grid; gap: 6px; justify-items: center; text-align: center; }
 .foot a { color: var(--ink); font-weight: 600; text-decoration: none; }
 .foot a:hover { text-decoration: underline; }
-.foot-links { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.foot-links { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; justify-content: center; }
 .el-app .foot-links .link { color: var(--ink); font-weight: 600; text-decoration: none; padding: 0; }
 .el-app .foot-links .link:hover { text-decoration: underline; }
 .foot-note { font-size: 12px; }
