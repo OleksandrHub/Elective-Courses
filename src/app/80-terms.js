@@ -1,4 +1,9 @@
-    // ---------- ліцензія й умови ----------
+    // ---------- License & terms ----------
+    /**
+     * Static legal documents (Ukrainian HTML) shown in the terms gate and in the
+     * modal opened from footer links with `data-doc="license"|"terms"`.
+     * @type {{license: string, terms: string}}
+     */
     const DOCS = {
       license: `<h2>Ліцензія MIT</h2>
         <p>© 2026 Олександр Кліщ (<a href="https://github.com/OleksandrHub" target="_blank" rel="noopener">OleksandrHub</a>). Авторські права належать автору.</p>
@@ -20,9 +25,24 @@
         <h3>5. Допустиме використання</h3><p>Користуйтеся лише зі своїм акаунтом і за правилами dl.tntu.edu.ua, без масових автоматичних запитів до сайту.</p>
         <h3>6. Ліцензія та контакти</h3><p>Код поширюється за ліцензією MIT. Питання й пропозиції — на <a href="https://github.com/OleksandrHub" target="_blank" rel="noopener">github.com/OleksandrHub</a>.</p>`,
     };
-    // Згода з умовами перед першим користуванням; нова редакція умов → питаємо знову
+    /**
+     * Current terms revision. Users must accept the terms before first use; bumping
+     * this value asks everyone to accept again.
+     * @type {string}
+     */
     const TERMS_VERSION = "2026-10-17";
+    /**
+     * Whether the user has accepted the current terms revision.
+     * @returns {boolean}
+     */
     const termsAccepted = () => store.get("termsAccepted", "") === TERMS_VERSION;
+    /**
+     * Show the blocking terms-of-use dialog. Account reading is suspended until
+     * the user ticks the checkbox and clicks "start", which stores the accepted
+     * version and (in live mode) loads the account. "Not now" (shown only when
+     * the host provides `env.close`) closes the overlay.
+     * @returns {void}
+     */
     function showTermsGate() {
       const g = document.createElement("div");
       g.className = "gate";
@@ -37,7 +57,7 @@
           <button class="primary" id="gate-yes" disabled>Почати користуватися</button>
         </div></div>`;
       root.append(g);
-      accountState = "idle";      // до згоди акаунт не читаємо
+      accountState = "idle";      // do not read the account until the terms are accepted
       if (!account) $("#account").innerHTML = "";
       g.querySelector("#gate-ok").addEventListener("change", e => { g.querySelector("#gate-yes").disabled = !e.target.checked; });
       g.querySelector("#gate-yes").addEventListener("click", () => {
@@ -48,6 +68,7 @@
       g.querySelector("#gate-no")?.addEventListener("click", () => env.close());
       g.querySelector("#gate-ok").focus();
     }
+    // Footer links with data-doc open the matching document in the modal.
     root.querySelector(".foot").addEventListener("click", e => {
       const d = e.target.closest("[data-doc]"); if (!d) return;
       $("#modal-body").innerHTML = `<div class="doc">${DOCS[d.dataset.doc]}</div>`;

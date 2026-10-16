@@ -1,9 +1,24 @@
-// Вкладка «Обов’язкові дисципліни» і форма контролю з їхніх силабусів.
+/**
+ * @file Reads the "Mandatory courses" tab (/mods/elective_courses/mandatory.php)
+ * and enriches each course with its form of control and term-paper flag taken
+ * from the course syllabus (/mods/syllabus/view.php?json=1). Runs in the user's
+ * session and only reads; nothing on the site is modified.
+ *
+ * Exports on `window.TntuEl`: `parseMandatory`, `addControls`.
+ */
 (() => {
   const E = (window.TntuEl ||= {});
   const { clean, sidOf } = E;
 
-  // Таблиця на «Обов’язкові дисципліни»: рядки-заголовки «N-й семестр» і рядки курсів (ID, назва, кредити, …)
+  /**
+   * Parse the mandatory-courses table. Single/two-cell rows like "N-й семестр"
+   * set the current semester; rows with a numeric first cell and at least three
+   * cells are courses (ID, name, credits, ...).
+   * @param {Document} doc Parsed mandatory.php page.
+   * @returns {MandatoryCourse[]} Courses in page order; `control` and `termpaper`
+   *   are not set yet (see {@link addControls}). A course spanning several
+   *   semesters appears once per semester with the same id.
+   */
   function parseMandatory(doc) {
     const out = [];
     let sem = null;
@@ -21,7 +36,13 @@
     return out;
   }
 
-  // Форма контролю й курсова з силабуса (кешується, бо силабуси змінюються рідко)
+  /**
+   * Load per-semester forms of control and the term-paper flag from a syllabus.
+   * The result is cached in the site's localStorage under `tntuel_syl_<sid>`
+   * (syllabi rarely change), so each syllabus is fetched only once per browser.
+   * @param {string} sid Syllabus id.
+   * @returns {Promise<SyllabusInfo>} Parsed (or cached) syllabus info.
+   */
   async function syllabusInfo(sid) {
     const key = "tntuel_syl_" + sid;
     try { const c = JSON.parse(localStorage.getItem(key)); if (c) return c; } catch {}
@@ -35,6 +56,17 @@
     return info;
   }
 
+  /**
+   * Fill `control` (and `termpaper`) on mandatory courses in place using their syllabi.
+   * Rows are grouped by course id and sorted by semester; each row then gets
+   * the syllabus entry with the same semester number, or, failing that, the
+   * entry at the same position when the syllabus lists as many semesters as
+   * there are rows, or the only entry when the syllabus has just one. The
+   * term-paper flag is put on the last semester's row only. Up to 4 syllabi
+   * are fetched concurrently; failures are logged and leave `control` unset.
+   * @param {MandatoryCourse[]} mandatory Courses from {@link parseMandatory}; mutated.
+   * @returns {Promise<void>}
+   */
   async function addControls(mandatory) {
     const groups = new Map();
     mandatory.forEach(m => groups.has(m.id) ? groups.get(m.id).push(m) : groups.set(m.id, [m]));

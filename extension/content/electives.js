@@ -1,9 +1,23 @@
-// Вкладки «Мене цікавлять та пропозиції кафедри» і «Обрані мною».
+/**
+ * @file Reads two elective-course tabs: "Interested & department suggestions"
+ * (interested.php) and "Selected by me" (selected.php). Both pages load their
+ * lists through AJAX fragments, which are fetched here as well. Runs in the
+ * user's session and only reads; nothing on the site is modified.
+ *
+ * Exports on `window.TntuEl`: `loadInterested`, `loadSelected`.
+ */
 (() => {
   const E = (window.TntuEl ||= {});
   const { clean, getDoc, abs, sidOf } = E;
 
-  // Посилання з рядка таблиці: ID у першій клітинці, у onclick або sid силабуса
+  /**
+   * Extract a course reference from a table row. The id is taken from a purely
+   * numeric first cell, otherwise from the first numeric argument of an
+   * `electives*(...)` call in the row's markup (e.g. onclick); the syllabus id
+   * comes from a `sid=` link.
+   * @param {HTMLTableRowElement} tr Table row.
+   * @returns {?CourseRef} Reference, or null if neither id nor sid was found.
+   */
   function rowRef(tr) {
     const cells = [...tr.cells];
     if (!cells.length) return null;
@@ -14,7 +28,18 @@
     return id || sid ? { id, sid } : null;
   }
 
-  // Вкладка «Мене цікавлять та пропозиції кафедри»: рекомендовані випусковою кафедрою і «Мене цікавлять»
+  /**
+   * Read the "Interested & department suggestions" tab. The tab URL is taken
+   * from the matching link on mandatory.php (falls back to interested.php); the
+   * list fragment URL from `electivesInitInterestedList(...)` is fetched with
+   * `fetch-interested=1` and appended to the page HTML. Headings, captions,
+   * panel titles and rows are then walked in document order: a short heading
+   * containing "рекомендован" starts the department-recommended section, one
+   * containing "цікав" starts the "I'm interested" section, and course rows
+   * are assigned to the current section (rows before any section are ignored).
+   * @param {Document} mandatoryDoc Parsed mandatory.php page (used to find the tab link).
+   * @returns {Promise<{recommended: CourseRef[], interested: CourseRef[]}>}
+   */
   async function loadInterested(mandatoryDoc) {
     const link = [...mandatoryDoc.querySelectorAll("a")].find(a => /Мене цікав/i.test(a.textContent));
     const { html } = await getDoc(abs(link?.getAttribute("href") || "/mods/elective_courses/interested.php"));
@@ -38,7 +63,20 @@
     return { recommended, interested };
   }
 
-  // Вкладка «Обрані мною»: скільки кредитів лишилось у кожному семестрі і що вже обрано
+  /**
+   * Read the "Selected by me" tab: credits still to choose per semester and
+   * the electives already selected. The page lists one block per semester
+   * (`[data-type="electives__selected_list"]` with `data-sid`); each block's
+   * fragment is fetched sequentially from the `electivesInitSelectedList(...)`
+   * URL with `fetch-selected=1&sid=<sid>`. In the combined HTML:
+   * - `electivesAddToSelectedModal(<x>, <semester>, <creditsLeft>)` calls give
+   *   the remaining credits per semester (last occurrence wins);
+   * - `electivesRemoveSelectedItem(<courseId>, <x>, <semester>)` calls give the
+   *   selected courses.
+   * @param {Document} mandatoryDoc Parsed mandatory.php page (used to find the tab link and its title).
+   * @returns {Promise<{selectedTitle: string, plan: {num: number, left: number}[], selected: {id: number, semester: number}[]}>}
+   *   Tab title as shown on the site, remaining credits sorted by semester, and selected courses.
+   */
   async function loadSelected(mandatoryDoc) {
     const link = [...mandatoryDoc.querySelectorAll("a")].find(a => /Обрані мною/i.test(a.textContent));
     const title = link ? clean(link.textContent) : "Обрані мною";

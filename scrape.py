@@ -1,10 +1,27 @@
 #!/usr/bin/env python3
-"""Збирає всі вибіркові дисципліни ТНТУ разом з даними із силабусів.
+"""Scrape every TNTU elective course together with data from its syllabus.
 
-Результат: extension/courses.json (для розширення) і extension/data.js (для index.html).
-Стандартні фільтри сайту (мова, підрозділ, спеціальність, ступінь, семестр) знімаються
-запитами до самого сайту, тож працюють так само, як там.
-Запуск: python3 scrape.py
+The course list comes from https://dl.tntu.edu.ua/mods/elective_courses/all.php and
+each course is enriched with fields from its syllabus JSON (semesters, control type,
+hours, language, department, specialities, ...).
+
+Output files (both contain the same data object: ``fetched``, ``options``, ``courses``):
+    extension/courses.json  -- loaded by the browser extension.
+    extension/data.js       -- ``window.ELECTIVES = {...};`` for the standalone index.html.
+
+Cache:
+    cache/<sid>.json             -- raw syllabus JSON per syllabus id.
+    cache/filters/<param>=<value>.json
+                                 -- course ids the site returns for one filter value.
+    Delete the cache/ directory (or parts of it) to force a fresh download.
+
+The site's standard filters (language, department, major/speciality, degree,
+semester) are not re-implemented from syllabus data. Instead the site itself is
+queried once per filter value and the resulting memberships are stored on each
+course as ``site_lang``, ``degrees``, ``site_sems``, ``deps`` and ``majors``, so
+filtering in the extension behaves exactly like on the site.
+
+Usage: python3 scrape.py
 """
 import html as htmllib
 import json
@@ -25,6 +42,18 @@ CACHE = ROOT / "cache"
 
 
 def get(url, retries=6):
+    """Download a URL and return its body as text, retrying on failure.
+
+    Args:
+        url: Absolute URL to fetch.
+        retries: Total number of attempts; the delay grows linearly (3s, 6s, ...).
+
+    Returns:
+        str: Response body decoded as UTF-8.
+
+    Raises:
+        Exception: The last error if every attempt fails.
+    """
     for i in range(retries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 electives-helper"})
@@ -37,6 +66,16 @@ def get(url, retries=6):
 
 
 def text(s):
+    """Convert an HTML fragment to plain text.
+
+    Strips tags, unescapes HTML entities and collapses whitespace.
+
+    Args:
+        s: HTML fragment.
+
+    Returns:
+        str: Single-line plain text.
+    """
     return re.sub(r"\s+", " ", htmllib.unescape(re.sub(r"<[^>]+>", " ", s))).strip()
 
 
@@ -45,6 +84,19 @@ TD_RE = re.compile(r"<td[^>]*>(.*?)</td>", re.S)
 
 
 def parse_rows(page_html):
+    """Parse course rows from one page of the course-list HTML table.
+
+    Rows with fewer than 6 cells (headers, separators) are skipped.
+
+    Args:
+        page_html: The ``html`` field of the list endpoint's JSON response.
+
+    Returns:
+        list[dict]: One dict per course with keys ``id``, ``name``,
+        ``credit_options`` (sorted list of allowed credit values), ``credits``
+        (smallest option, or 0), ``rating``, ``lecturer``, ``lecturer_degree``,
+        ``cv`` (lecturer CV URL or None) and ``sid`` (syllabus id or None).
+    """
     rows = []
     for tr in ROW_RE.findall(page_html):
         tds = TD_RE.findall(tr)
@@ -69,12 +121,30 @@ def parse_rows(page_html):
 
 
 def list_url(page, **filters):
+    """Build the URL of one page of the course list.
+
+    Args:
+        page: 1-based page number.
+        **filters: Site filter parameters overriding ``LIST_PARAMS``
+            (e.g. ``l="en"``, ``degree="master"``, ``department=12``).
+
+    Returns:
+        str: URL of the list endpoint returning JSON.
+    """
     params = {**LIST_PARAMS, **filters, "fetch-all": 1, "p": page}
     return BASE + "/mods/elective_courses/all.php?&" + urllib.parse.urlencode(params)
 
 
 def fetch_list(**filters):
-    """Усі рядки списку з урахуванням фільтрів сайту."""
+    """Fetch all rows of the course list, across all pages, for given site filters.
+
+    Args:
+        **filters: Site filter parameters (see ``list_url``); none means "all courses".
+
+    Returns:
+        tuple[list[dict], int]: Parsed rows (see ``parse_rows``) and the total
+        count reported by the site (``num_total``), useful as a sanity check.
+    """
     first = json.loads(get(list_url(1, **filters)))
     pages = max([int(p) for p in re.findall(r"p=(\d+)", first["html"])] or [1])
     rows = parse_rows(first["html"])
@@ -84,7 +154,18 @@ def fetch_list(**filters):
 
 
 def filter_ids(param, value):
-    """ID курсів, які сайт показує для одного значення фільтра (з кешем)."""
+    """Return the ids of courses the site shows for a single filter value.
+
+    Results are cached in ``cache/filters/<param>=<value>.json``.
+
+    Args:
+        param: Site filter parameter name (``l``, ``degree``, ``semester``,
+            ``department`` or ``major``).
+        value: Filter value as the site expects it.
+
+    Returns:
+        list[int]: Course ids matching the filter.
+    """
     f = CACHE / "filters" / f"{param}={value}.json"
     if f.exists():
         return json.loads(f.read_text())
@@ -96,6 +177,16 @@ def filter_ids(param, value):
 
 
 def fetch_syllabus(sid):
+    """Fetch the syllabus JSON for a course, using ``cache/<sid>.json`` if present.
+
+    Errors are reported to stderr and not cached, so a later run retries them.
+
+    Args:
+        sid: Syllabus id (UUID-like string from the list page).
+
+    Returns:
+        dict | None: Parsed syllabus data, or None if the download/parse failed.
+    """
     CACHE.mkdir(exist_ok=True)
     f = CACHE / f"{sid}.json"
     if f.exists():
@@ -111,6 +202,14 @@ def fetch_syllabus(sid):
 
 
 def num(v):
+    """Parse a number that may use a decimal comma.
+
+    Args:
+        v: Any value (str, int, float, None, ...).
+
+    Returns:
+        float | None: The parsed number, or None if it cannot be parsed.
+    """
     try:
         return float(str(v).replace(",", "."))
     except (TypeError, ValueError):
@@ -118,6 +217,22 @@ def num(v):
 
 
 def enrich(row, s):
+    """Add syllabus-derived fields to a course row (in place).
+
+    Added keys: ``year``, ``semester``, ``semesters`` (list of
+    ``{"semester", "control"}``; control defaults to ``"exam"``), ``controls``,
+    ``kind``, ``lang``, ``faculty``, ``department``, ``specialities``,
+    ``program_type``, ``hours``, ``syl_credits``, ``termpaper``, ``objective``
+    (truncated to 600 chars) and ``prerequisites`` (truncated to 300 chars).
+
+    Args:
+        row: Course row from ``parse_rows``.
+        s: Syllabus dict from ``fetch_syllabus``; if missing or not a dict the
+            row is returned unchanged.
+
+    Returns:
+        dict: The same ``row`` object.
+    """
     if not s or not isinstance(s, dict):
         return row
     pd = s.get("points_distribution") if isinstance(s.get("points_distribution"), list) else []
@@ -154,10 +269,21 @@ def enrich(row, s):
 
 
 def fetch_options():
-    """Значення стандартних фільтрів сайту, з тією ж структурою, що й там."""
+    """Read the options of the site's standard filters from the list page.
+
+    The structure mirrors the site's ``<select>`` elements so the extension can
+    render the same dropdowns.
+
+    Returns:
+        dict: ``{"departments": [...], "majors": [...]}`` where each department is
+        ``{"id", "name", "sub"}`` (``sub`` is True for indented sub-units) and each
+        major group is ``{"label", "items": [{"id", "name"}, ...]}`` (one group per
+        ``<optgroup>``).
+    """
     page = get(BASE + "/mods/elective_courses/all.php")
 
     def select(name):
+        """Return the raw HTML of the ``<select name=...>`` element, or ""."""
         m = re.search(r'<select name="%s".*?</select>' % name, page, re.S)
         return m.group(0) if m else ""
 
@@ -172,7 +298,20 @@ def fetch_options():
 
 
 def site_filters(options):
-    """Для кожного курсу: за яких значень стандартних фільтрів сайт його показує."""
+    """For each course, find which standard filter values make the site show it.
+
+    The site is queried once per filter value (language, degree, semester, every
+    department and every major) in parallel via ``filter_ids``, so memberships
+    match the site's own filtering logic exactly.
+
+    Args:
+        options: Filter options from ``fetch_options``.
+
+    Returns:
+        dict[int, dict[str, list]]: Course id -> mapping of ``site_lang``,
+        ``degrees``, ``site_sems``, ``deps`` and ``majors`` to the filter values
+        under which the course appears. Missing keys mean "no values".
+    """
     jobs = [("l", "uk"), ("l", "en"), ("degree", "bachelor"), ("degree", "master"), ("degree", "phd"),
             ("semester", "fall"), ("semester", "spring")]
     jobs += [("department", d["id"]) for d in options["departments"]]
@@ -189,6 +328,12 @@ def site_filters(options):
 
 
 def main():
+    """Run the full scrape and write extension/courses.json and extension/data.js.
+
+    Steps: fetch the course list, download syllabi (6 threads), enrich rows,
+    read filter options, capture site-filter memberships, then write both
+    output files with a ``fetched`` timestamp.
+    """
     rows, total = fetch_list()
     print(f"Курсів у списку: {len(rows)} (сайт каже {total})", file=sys.stderr)
     sids = [r["sid"] for r in rows if r["sid"]]

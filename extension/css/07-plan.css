@@ -1,4 +1,6 @@
-/* ===== Шухляда плану ===== */
+/* Plan drawer (picked courses per semester, credit gauges, combinations),
+   the bottom comparison bar and modal dialogs. */
+/* ===== Plan drawer ===== */
 .drawer-back { position: fixed; inset: 0; z-index: 40; background: rgba(10, 13, 19, .35); }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 41; width: min(430px, 100%); background: var(--paper); box-shadow: -10px 0 40px rgba(0, 0, 0, .2);
   transform: translateX(105%); transition: transform .22s ease; overflow: auto; padding: 0 18px 30px; }
@@ -29,7 +31,7 @@
 .combo li { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 3px 0; font-size: 13px; }
 .combo li .ctl { justify-content: center; padding: 1px 0; }
 
-/* ===== Порівняння і модалка ===== */
+/* ===== Comparison and modal ===== */
 .comparebar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 25; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
   background: var(--navy); color: var(--on-navy); border-radius: 999px; padding: 8px 8px 8px 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); max-width: calc(100% - 32px); }
 .comparebar .hint { color: var(--on-navy-muted); }

@@ -1,4 +1,6 @@
-/* Стилі інтерфейсу. Порядок важливий: пізніші файли перекривають ранні. */
+/* Entry stylesheet for the UI. Imports the parts in cascade order:
+   order matters, because later files override rules from earlier ones
+   (e.g. 08-narrow.css overrides layout set in 03..07). */
 @import url("01-tokens.css");
 @import url("02-base.css");
 @import url("03-header.css");

@@ -1,4 +1,6 @@
-/* ===== Верхня панель ===== */
+/* Sticky top bar: brand, tabs, icon buttons, account, theme picker and plan button,
+   with responsive tweaks for laptop, tablet and phone widths. */
+/* ===== Header ===== */
 .el-app { --top-h: 60px; }
 .top { position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "brand tabs actions";
   align-items: center; column-gap: 20px; padding: 0 20px; height: var(--top-h); background: var(--navy); color: var(--on-navy); }
@@ -15,14 +17,14 @@
 .top-right { grid-area: actions; display: flex; align-items: center; gap: 8px; justify-self: end; }
 .account { display: flex; min-width: 0; }
 
-/* кнопки-іконки в шапці */
+/* icon buttons in the header */
 .el-app .top-ic { width: 36px; height: 36px; padding: 0; display: inline-grid; place-items: center; border-radius: 10px; font-size: 16px; line-height: 1;
   background: var(--navy-2); border: 1px solid transparent; color: var(--on-navy); cursor: pointer; list-style: none; }
 .el-app .top-ic:hover { border-color: var(--on-navy-muted); }
 summary.top-ic::-webkit-details-marker { display: none; }
 summary.top-ic::marker { content: ""; }
 
-/* акаунт */
+/* account */
 .el-app .acc { display: inline-flex; align-items: center; gap: 8px; height: 36px; background: var(--navy-2); border: 1px solid transparent; color: var(--on-navy);
   border-radius: 999px; padding: 0 12px 0 5px; font-size: 13px; max-width: 280px; white-space: nowrap; }
 .el-app .acc:hover { border-color: var(--on-navy-muted); }
@@ -33,7 +35,7 @@ summary.top-ic::marker { content: ""; }
 .acc.muted { color: var(--on-navy-muted); padding: 0 12px; }
 .el-app .acc.bad { background: var(--exam); color: #fff; padding: 0 12px; }
 
-/* тема */
+/* theme picker */
 .theme-pop .pop-panel { width: 230px; padding: 8px; top: calc(100% + 10px); }
 .theme-menu .lbl { margin: 4px 8px 6px; }
 .el-app .theme-opt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 1px solid transparent; background: none; border-radius: 10px; padding: 7px 8px; color: var(--ink); }
@@ -47,7 +49,7 @@ summary.top-ic::marker { content: ""; }
 .sw-dark { background: linear-gradient(135deg, #0a0d13 50%, #2a3140 50%); }
 .sw-auto { background: linear-gradient(135deg, #f6f3ec 50%, #0f1218 50%); }
 
-/* кнопка плану */
+/* plan button */
 .el-app .plan-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; background: var(--amber); color: var(--on-amber); border: none;
   border-radius: 999px; padding: 0 5px 0 14px; font-weight: 700; white-space: nowrap; }
 .pb-sems { display: inline-flex; gap: 4px; }
@@ -58,19 +60,19 @@ summary.top-ic::marker { content: ""; }
 .pb-total { display: none; }
 .pb-title { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 
-/* ноутбук: ховаємо підпис під назвою */
+/* laptop: hide the caption under the title */
 @media (max-width: 1240px) {
   .brand small { display: none; }
   .acc .acc-name { max-width: 150px; }
 }
-/* планшет: вкладки — окремим рядком на всю ширину */
+/* tablet: tabs move to their own full-width row */
 @media (max-width: 1020px) {
   .el-app { --top-h: 104px; }
   .top { grid-template-columns: auto 1fr; grid-template-areas: "brand actions" "tabs tabs"; grid-template-rows: 58px 46px; padding: 0 16px; }
   .tabs { border-top: 1px solid rgba(255, 255, 255, .1); margin: 0 -16px; padding: 0 8px; }
   .el-app .tabs button { flex: 1 0 auto; }
 }
-/* телефон: компактні кнопки */
+/* phone: compact buttons */
 @media (max-width: 640px) {
   .top-right { gap: 6px; }
   .acc .acc-name, .acc .acc-st { display: none; }

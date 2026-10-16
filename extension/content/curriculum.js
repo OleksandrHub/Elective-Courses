@@ -1,13 +1,47 @@
-// «Індивідуальний навчальний план»: усі семестри, дисципліни, контроль, оцінки, практика.
+/**
+ * @file Reads the "Individual curriculum" (/mods/curriculum/index.php?fetch=true):
+ * all semesters with their mandatory and elective courses, hours, forms of
+ * control, grades and internships/practice. The fragment shows one semester at a
+ * time; other semesters are requested via `&req=<student>:<semester>` (the value
+ * passed to the site's `sem_switch_handler`). Runs in the user's session and only
+ * reads; nothing on the site is modified.
+ *
+ * Exports on `window.TntuEl`: `loadCurriculum`.
+ */
 (() => {
   const E = (window.TntuEl ||= {});
   const { clean, getDoc } = E;
 
-  // «Індивідуальний навчальний план»: фрагмент index.php?fetch=true, семестри перемикаються через req=<студент>:<семестр>
+  /** Prefix patterns of the control column's Ukrainian text mapped to control codes. */
   const CONTROL_TEXT = [[/^екз/i, "exam"], [/^диф/i, "diff_credit"], [/^зал/i, "credit"], [/^кр$/i, "cw"], [/^кп$/i, "cp"]];
+  /**
+   * Map a control cell's text to a control code.
+   * @param {string} t Cell text.
+   * @returns {?string} "exam" | "diff_credit" | "credit" | "cw" (course work) | "cp" (course project);
+   *   unrecognized text is returned cleaned as-is; empty text gives null.
+   */
   const toControl = t => (CONTROL_TEXT.find(([re]) => re.test(clean(t))) || [null, clean(t) || null])[1];
+  /**
+   * Parse a number that may use a decimal comma.
+   * @param {string} t Text.
+   * @returns {?number} The number, or null if not numeric.
+   */
   const toNum = t => { const v = parseFloat(clean(t).replace(",", ".")); return Number.isFinite(v) ? v : null; };
 
+  /**
+   * Parse one semester view of the curriculum fragment.
+   * - Student info comes from `.curriculum-info p` and `.curriculum-label`.
+   * - In `.curriculum-subjects-table`, single-cell rows are headers: "N семестр – X кредитів"
+   *   sets the semester number/total, "Обов..." / "Вибірков..." switch the row kind
+   *   between mandatory and elective and carry that group's credits. Rows with at
+   *   least 8 cells are courses: name (with "ID n" tags stripped), hours/credits,
+   *   lecture/practical/lab/self-study hours, control, and grades (ZVO, national, ECTS).
+   * - `.curriculum-practica-table` rows are practice/internship entries.
+   * - `.curriculum-nav` links give the `req` value and number of every semester; the
+   *   active one is the current semester.
+   * @param {Document} doc Parsed curriculum fragment.
+   * @returns {{student: Curriculum["student"], sem: CurriculumSemester, navs: {req: string, num: number, current: boolean}[]}}
+   */
   function parseCurriculum(doc) {
     const info = [...doc.querySelectorAll(".curriculum-info p")].map(p => clean(p.textContent));
     const student = {
@@ -54,6 +88,12 @@
     return { student, sem, navs };
   }
 
+  /**
+   * Load the whole curriculum: the default (current) semester first, then every
+   * other semester from the navigation via `&req=...`, at most 3 requests at a
+   * time. A semester that fails to load is logged and skipped.
+   * @returns {Promise<Curriculum>} Student info, current semester number and all semesters sorted by number.
+   */
   async function loadCurriculum() {
     const url = "/mods/curriculum/index.php?fetch=true";
     const first = parseCurriculum((await getDoc(url)).doc);

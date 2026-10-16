@@ -1,23 +1,44 @@
-// Запускається на сторінках вибіркових дисциплін dl.tntu.edu.ua.
-// Додає кнопку «Розумний підбір», відкриває інтерфейс поверх сайту і читає
-// дані акаунта (обов’язкові, «Обрані мною») через вашу поточну сесію. Нічого не змінює на сайті.
-// Дані акаунта читають скрипти з content/ (див. manifest.json), тут — кнопка й оверлей.
+/**
+ * @file Entry content script, loaded last on the dl.tntu.edu.ua elective-course
+ * pages. Adds a floating "Smart pick" button and opens the app UI as a
+ * full-screen overlay on top of the site (also automatically when the URL hash is
+ * `#smart`). Account data is read by the other content scripts (see manifest.json)
+ * through the user's current session; nothing on the site is modified. Guarded
+ * by `window.__tntuElectives` so it runs only once per page.
+ *
+ * Reads `loadAccount` from `window.TntuEl` and passes it to `window.ElectivesApp.mount`.
+ */
 (() => {
   if (window.__tntuElectives) return;
   window.__tntuElectives = true;
   const { loadAccount } = window.TntuEl;
 
-  // Gemini: запити йдуть через фоновий воркер, ключ лежить у сховищі розширення (сайт його не бачить)
+  /**
+   * Bridge to the Gemini API via the background service worker. The API key
+   * stays in the extension's storage and is never exposed to the site.
+   * @type {{
+   *   request: (url: string, method: string, body?: string) => Promise<{ok: boolean, status: number, body: string}>,
+   *   keyInfo: () => Promise<{hasKey: boolean, hint: string}>,
+   *   setKey: (key: string) => Promise<true>
+   * }}
+   */
   const gemini = {
     request: (url, method, body) => chrome.runtime.sendMessage({ type: "gemini-fetch", url, method, body }),
     keyInfo: () => chrome.runtime.sendMessage({ type: "gemini-key-get" }),
     setKey: key => chrome.runtime.sendMessage({ type: "gemini-key-set", key }),
   };
 
-  // ---------- оверлей ----------
+  // ---------- Overlay ----------
+  /** @type {?HTMLDivElement} Shadow-DOM host of the overlay; created on first open. */
   let host = null;
+  /** Page scroll style to restore when the overlay closes. */
   const prevOverflow = document.documentElement.style.overflow;
 
+  /**
+   * Hide the overlay (it is kept for reuse), restore page scrolling and drop
+   * the `#smart` hash from the URL.
+   * @returns {void}
+   */
   function close() {
     if (!host) return;
     host.style.display = "none";
@@ -25,6 +46,15 @@
     if (location.hash === "#smart") history.replaceState(null, "", location.pathname + location.search);
   }
 
+  /**
+   * Show the overlay, creating it on first call: a fixed full-screen host with
+   * an open shadow root (isolating styles from the site) that loads the
+   * extension's css/index.css, fetches the bundled courses.json and mounts
+   * `ElectivesApp` with the live environment (loadAccount, close, gemini bridge,
+   * extension version). Later calls just un-hide it. Page scrolling is locked
+   * while open. A loading error is shown inside the overlay.
+   * @returns {Promise<void>}
+   */
   async function open() {
     document.documentElement.style.overflow = "hidden";
     if (host) { host.style.display = "block"; return; }

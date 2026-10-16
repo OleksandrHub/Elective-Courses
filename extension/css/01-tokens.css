@@ -1,4 +1,28 @@
-/* ===== Токени ===== */
+/*
+ * Design tokens: CSS custom properties shared by every other stylesheet,
+ * plus the colour themes selected via the data-theme attribute on .el-app.
+ *
+ * Themes (data-theme):
+ *   tntu    - default; light theme matching dl.tntu.edu.ua
+ *             (#405D72 blue-grey header, #0277b3 links, Nunito font)
+ *   classic - the original warm-paper light palette (the base .el-app values)
+ *   dark    - always-dark palette
+ *   auto    - classic in light mode, dark when the OS prefers a dark scheme
+ *
+ * Main custom properties:
+ *   --paper    page background            --surface  cards / panels
+ *   --sunken   inset areas, inputs        --ink      primary text
+ *   --muted    secondary text             --line     borders and dividers
+ *   --navy     header bar background (--navy-2 hover/raised, --on-navy text on it)
+ *   --amber    accent colour (buttons, highlights, links in the tntu theme);
+ *              --amber-soft is its tinted background, --on-amber text on it
+ *   --exam     "exam" assessment type     --zalik    "zalik" (pass/fail credit)
+ *   --rec      recommended courses        --warn     warnings / conflicts
+ *              (each has a matching *-soft background variant)
+ *   --radius   corner radius              --shadow   card shadow
+ *   --top-h    height of the sticky top bar (defined in 03-header.css)
+ */
+/* ===== Design tokens ===== */
 .el-app {
   --paper: #f6f3ec; --surface: #fffdf8; --sunken: #efebe1; --ink: #18202f; --muted: #6c6f78; --line: #e4ded1;
   --navy: #17223b; --navy-2: #22304f; --on-navy: #f3efe6; --on-navy-muted: #a9b2c6;
@@ -10,7 +34,7 @@
   font: 14px/1.45 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-feature-settings: "tnum" 1, "cv11" 1;
 }
-/* Теми: data-theme = tntu (за замовчуванням) | classic | dark | auto (класична, темна за системою) */
+/* Themes: data-theme = tntu (default) | classic | dark | auto (classic, dark following the system setting) */
 @media (prefers-color-scheme: dark) {
   .el-app[data-theme="auto"] {
     --paper: #0f1218; --surface: #171b23; --sunken: #1d222c; --ink: #ebe7de; --muted: #969ca8; --line: #272d38;
@@ -29,7 +53,7 @@
     --rec: #ab9fff; --rec-soft: #262241; --warn: #ffc65c; --warn-soft: #3a3020;
     --shadow: none;
 }
-/* Світла тема в стилі dl.tntu.edu.ua: синьо-сіра шапка #405D72, посилання #0277b3, шрифт Nunito */
+/* Light theme styled after dl.tntu.edu.ua: blue-grey header #405D72, links #0277b3, Nunito font */
 .el-app[data-theme="tntu"] {
   --paper: #f5f8fb; --surface: #ffffff; --sunken: #eef3f8; --ink: #1f2328; --muted: #66727e; --line: #dfe6ed;
   --navy: #405d72; --navy-2: #557489; --on-navy: #ffffff; --on-navy-muted: #c9d7e3;

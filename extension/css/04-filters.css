@@ -1,13 +1,20 @@
-/* ===== Фільтри ===== */
-.filterbar { position: sticky; top: var(--top-h); z-index: 15; background: var(--surface); border-bottom: 1px solid var(--line); padding: 12px 22px; display: flex; flex-direction: column; gap: 10px; }
+/* Sticky filter bar below the header: search, filter pills and dropdowns. */
+/* ===== Filters ===== */
+.filterbar { position: sticky; top: var(--top-h); z-index: 15; background: var(--surface); border-bottom: 1px solid var(--line); box-shadow: 0 6px 16px -14px rgba(0, 0, 0, .35); }
+.fb-inner { max-width: 1180px; margin: 0 auto; padding: 12px 22px; display: flex; flex-direction: column; gap: 10px; }
+.fb-search { display: flex; gap: 8px; }
+.fb-search .search { flex: 1; min-width: 0; }
+.el-app .search input { min-width: 0; }
+.el-app .fb-toggle { flex: none; display: none; align-items: center; gap: 6px; height: 44px; border-radius: 12px; font-weight: 600; }
+.fb-toggle span:not(:empty) { background: var(--amber); color: var(--on-amber); border-radius: 999px; padding: 0 7px; font-size: 12px; font-weight: 700; }
 .search { display: flex; align-items: center; gap: 10px; background: var(--sunken); border-radius: 12px; padding: 0 14px; height: 44px; }
 .search span { font-size: 20px; color: var(--muted); }
 .el-app .search input { flex: 1; border: none; background: none; font-size: 16px; padding: 0; height: 100%; }
 .el-app .search input:focus { outline: none; }
 .search:focus-within { box-shadow: 0 0 0 2px var(--amber); }
 .search kbd { font: 12px ui-monospace, monospace; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; background: var(--surface); }
-.pills { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.pills .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+.pills { display: flex; flex-direction: column; gap: 8px; }
+.pill-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .el-app .pill { appearance: none; -webkit-appearance: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px;
   border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 500 13px/1 inherit; cursor: pointer; max-width: 230px; list-style: none; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
 .el-app select.pill { padding-right: 28px; background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
@@ -36,8 +43,13 @@ summary.pill[data-n]:not([data-n=""])::after { content: attr(data-n); font-size:
 .pop-panel details summary { cursor: pointer; font-size: 13px; font-weight: 600; margin: 4px 0; }
 .pop-panel details { max-height: 260px; overflow: auto; }
 
-.resultbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 22px 4px; max-width: 1180px; margin: 0 auto; }
-.count { font-size: 15px; }
+.resultbar { max-width: 1180px; margin: 0 auto; padding: 16px 22px 4px; display: flex; flex-direction: column; gap: 8px; }
+.rb-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.el-app .rb-btn { height: 32px; border-radius: 999px; padding: 0 12px; font-size: 13px; color: var(--ink); background: var(--surface); }
+.rb-sort { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.el-app .rb-sort .pill { max-width: none; }
+.active-chips:empty { display: none; }
+.count { font-size: 15px; white-space: nowrap; }
 .count b { font-size: 20px; letter-spacing: -.02em; }
 .active-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .el-app .achip { display: inline-flex; align-items: center; gap: 6px; background: var(--amber-soft); border: none; color: var(--ink); border-radius: 999px; padding: 3px 4px 3px 11px; font-size: 12.5px; max-width: 280px; }

@@ -1,9 +1,60 @@
-    // ---------- звіт ----------
+    // ---------- Report ----------
+    /**
+     * @typedef {Object} ReportSemester
+     * @property {string} key Plan semester key (e.g. "s7"), or "s" + num if not in the plan.
+     * @property {?number} num Semester number, or null if unknown.
+     * @property {"fall"|"spring"} parity Fall (odd) or spring (even) semester.
+     * @property {string} label Display label.
+     * @property {string} sub Secondary label (season, "current"/"finished" marks).
+     * @property {boolean} inPlan Whether the semester is part of the user's plan.
+     * @property {boolean} [current] Whether it is the student's current semester.
+     * @property {boolean} [past] Whether it is already finished.
+     */
+    /**
+     * @typedef {Object} ReportRow
+     * @property {"mand"|"celec"|"cw"|"prac"|"plan"|"site"} type Row kind: mandatory, curriculum elective,
+     *   coursework, practice, elective from my plan, elective selected on the site.
+     * @property {string} name Discipline name.
+     * @property {number} credits ECTS credits.
+     * @property {?string} control Control form ("exam", "credit", "diff_credit", …).
+     * @property {boolean} [termpaper] Whether the discipline has a term paper.
+     * @property {string} [url] Syllabus or course link.
+     * @property {{zvo?: string, ects?: string, nat?: string}} [grade] Grade from the curriculum, if any.
+     * @property {Object} [hours] Raw curriculum row (kept for hour details).
+     */
+    /**
+     * @typedef {Object} ReportTotals
+     * @property {number} n Number of disciplines (excluding coursework and practice rows).
+     * @property {number} credits Total credits.
+     * @property {number} exam Exams count.
+     * @property {number} zalik Pass/fail credits count.
+     * @property {number} diff Differentiated credits count.
+     * @property {number} cw Coursework / term papers count.
+     * @property {number} unknown Disciplines with unknown control form.
+     * @property {number[]} grades Numeric grades found.
+     * @property {?number} avg Mean grade, or null if none.
+     */
+
+    /**
+     * Curriculum data for a semester number from the account's individual study plan.
+     * @param {?number} n Semester number.
+     * @returns {Object|undefined} Curriculum semester ({num, rows, practice, total, electiveCredits}).
+     */
     const curSem = n => (account?.curriculum?.semesters || []).find(x => x.num === n);
-    // Семестр плану з номером: 7 → {key: "s7", label: "7 семестр (осінь)", …}
+    /**
+     * Builds a numbered plan semester, e.g. 7 → {key: "s7", label: "7 семестр (осінь)", …}.
+     * @param {number} num Semester number (odd = fall, even = spring).
+     * @param {string|number} [target=""] Credit limit.
+     * @returns {PlanSemester}
+     */
     const semEntry = (num, target = "") => ({ key: "s" + num, num, label: `${num} семестр (${num % 2 ? "осінь" : "весна"})`,
       short: `${num} сем`, parity: num % 2 ? "fall" : "spring", target });
-    // Замінити семестри плану й перенести курси всіх варіантів (за ключем, інакше — за осінь/весна)
+    /**
+     * Replaces the plan semesters and remaps basket items of all variants:
+     * items keep their semester key if it still exists, otherwise move to the
+     * new semester with the same parity (fall/spring), or the first one.
+     * @param {PlanSemester[]} newPlan New plan semesters.
+     */
     function setPlanSemesters(newPlan) {
       const old = plan;
       plan = newPlan;
@@ -15,14 +66,25 @@
       });
       save();
     }
-    // Якщо «Обрані мною» не дали номерів, беремо наступний навчальний рік з навчального плану:
-    // поточний 5 або 6 семестр → обираємо на 7 (осінь) і 8 (весна)
+    /**
+     * If the "Обрані мною" tab gave no semester numbers, numbers the plan semesters
+     * as the next study year from the curriculum: current semester 5 or 6 →
+     * choose for 7 (fall) and 8 (spring). No-op without curriculum data or when
+     * all plan semesters are already numbered.
+     */
     function numberPlanSemesters() {
       const cur = account?.curriculum?.current;
       if (!cur || plan.every(p => p.num)) return;
       const fall = cur % 2 ? cur + 2 : cur + 1;
       setPlanSemesters(plan.map(p => p.num ? p : semEntry(p.parity === "fall" ? fall : fall + 1, p.target)));
     }
+    /**
+     * Lists semesters available in the report. With an account: the union of
+     * semester numbers from the curriculum, mandatory courses, plan and site
+     * selections (sorted), plus unnumbered plan semesters. Without an account:
+     * just the plan semesters.
+     * @returns {ReportSemester[]}
+     */
     function reportSemesters() {
       if (account) {
         const cur = account.curriculum;
@@ -37,9 +99,24 @@
       }
       return plan.map(p => ({ key: p.key, num: null, parity: p.parity, label: p.label, sub: "", inPlan: true }));
     }
+    /**
+     * Link for a course: syllabus page by syllabus ID (given or from the catalog),
+     * else the dl.tntu.edu.ua course bounce link, else "".
+     * @param {?number} id Course ID.
+     * @param {?number} [sid] Syllabus ID.
+     * @returns {string} URL or empty string.
+     */
     const courseUrl = (id, sid) => sid ? `https://dl.tntu.edu.ua/mods/syllabus/view.php?sid=${sid}`
       : BY_ID.get(id)?.sid ? `https://dl.tntu.edu.ua/mods/syllabus/view.php?sid=${BY_ID.get(id).sid}`
       : id ? `https://dl.tntu.edu.ua/bounce.php?course=${id}` : "";
+    /**
+     * Collects report rows for one semester, deduplicated by course ID, in order:
+     * curriculum rows and practices (or, without curriculum, the account's
+     * mandatory courses), then planned electives from the active basket, then
+     * electives selected on the site.
+     * @param {ReportSemester} e Semester.
+     * @returns {ReportRow[]}
+     */
     function reportRows(e) {
       const rows = [], seen = new Set();
       const cs = curSem(e.num);
@@ -68,6 +145,12 @@
       }
       return rows;
     }
+    /**
+     * Aggregates credits, control-form counts, coursework and grades over rows.
+     * Coursework rows count only as coursework; practice rows add credits/grades only.
+     * @param {ReportRow[]} rows
+     * @returns {ReportTotals}
+     */
     function totals(rows) {
       const t = { n: 0, credits: 0, exam: 0, zalik: 0, diff: 0, cw: 0, unknown: 0, grades: [] };
       rows.forEach(r => {
@@ -83,8 +166,20 @@
       t.avg = t.grades.length ? t.grades.reduce((a, b) => a + b, 0) / t.grades.length : null;
       return t;
     }
+    /** Display labels (Ukrainian) for {@link ReportRow} types. @type {Object<string, string>} */
     const TYPE = { mand: "Обов’язкова", celec: "Вибіркова · у навч. плані", cw: "Курсова", prac: "Практика", plan: "Вибіркова · мій план", site: "Вибіркова · обрано на сайті" };
+    /**
+     * Formats a grade as "zvo · ects · nat" (skipping empty parts).
+     * @param {{zvo?: string, ects?: string, nat?: string}} [g] Grade.
+     * @returns {string} Text, or "" when there is no grade.
+     */
     const gradeText = g => g && (g.zvo || g.ects || g.nat) ? [g.zvo, g.ects, g.nat].filter(Boolean).join(" · ") : "";
+    /**
+     * Renders the semester report view: preset and per-semester toggle chips
+     * (selection persisted in `reportSel`, default = plan semesters), a summary
+     * tile row when several semesters are shown, and per-semester tiles and tables.
+     * Stores the rendered blocks in `window.__elReport` for copy/print handlers.
+     */
     function renderReport() {
       const sems = reportSemesters();
       const presets = {
@@ -92,10 +187,12 @@
       };
       const chosen = new Set((reportSel || presets.plan.map(s => s.key)).filter(k => sems.some(s => s.key === k)));
       const shownSems = chosen.size ? sems.filter(s => chosen.has(s.key)) : sems;
+      // A preset chip is "on" when it selects exactly the shown semesters
       const isPreset = k => presets[k].length && presets[k].length === shownSems.length && presets[k].every(s => shownSems.includes(s));
       const blocks = shownSems.map(e => ({ e, rows: reportRows(e) }));
       const all = totals(blocks.flatMap(b => b.rows));
       const st = account?.curriculum?.student;
+      // Stat tiles: a single tile, and the full tile row for a ReportTotals
       const tile = (n, l, cls = "") => `<div class="tile ${cls}"><b>${n}</b><span>${l}</span></div>`;
       const tilesHTML = (t, total) => `${tile(fmt(t.credits), total ? "кредитів разом" : "кредитів")}${tile(t.exam, "екзаменів", "exam")}${tile(t.zalik + t.diff, "заліків" + (t.diff ? ` (${t.diff} диф.)` : ""), "zalik")}${tile(t.cw, "курсових")}${t.avg != null ? tile(t.avg.toFixed(1), "середній бал") : tile(t.n, "дисциплін")}`;
       const preset = (k, l) => presets[k].length ? `<button class="chip preset ${isPreset(k) ? "on" : ""}" data-rpreset="${k}">${l}</button>` : "";
@@ -135,6 +232,7 @@
         }).join("")}`;
       window.__elReport = blocks;
     }
+    // Report buttons: semester presets/toggles, variant switch, copy as TSV for Excel, print
     $("#view-report").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
       if (b.dataset.rpreset || b.dataset.rsem) {
@@ -145,7 +243,7 @@
           reportSel = sems.filter(s => p === "all" || (p === "plan" && s.inPlan) || (p === "cur" && s.current) || (p === "past" && s.past)).map(s => s.key);
         } else {
           const k = b.dataset.rsem;
-          // якщо показано «усі», перший клік лишає лише цей семестр
+          // when all semesters are shown, the first click keeps only this one
           reportSel = shown.length === sems.length ? [k] : shown.includes(k) ? shown.filter(x => x !== k) : [...shown, k];
           if (!reportSel.length) reportSel = [k];
         }

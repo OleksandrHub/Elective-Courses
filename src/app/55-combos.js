@@ -1,7 +1,26 @@
-    // ---------- комбінації ----------
+    // ---------- Combinations ----------
+    /**
+     * Finds sets of courses whose credits add up exactly to the credits still
+     * missing in the selected plan semester (#c-sem) and renders them into #combos.
+     *
+     * Candidate pool: courses not already planned/selected on the site, not
+     * same-named as a basket course, taught in the semester's parity and not an
+     * exact duplicate of a mandatory/taken course. If any of them are starred,
+     * only starred ones are used; otherwise the current catalog filters apply.
+     * The pool is sorted "smart" and capped at 70 courses.
+     *
+     * Search: every (course, credit option) pair becomes an option; a bounded
+     * DFS over options in index order (so each set is found once) collects all
+     * subsets with sum === need, pruning branches that overshoot, reuse a course
+     * (by ID or normalized name), exceed maxK courses (#c-max, clamped 1..5), or
+     * once more than 4000 results are collected. Results are ranked by fewer
+     * courses, then more department-recommended courses, then higher mean rating;
+     * the top 12 are kept in `lastCombos` for the add buttons.
+     */
     function runCombos() {
       const s = plan.find(p => p.key === $("#c-sem").value) || plan[0];
       const target = +s.target || 0, have = planSum(s);
+      // Missing credits, rounded to 0.5 to avoid floating-point drift
       const need = Math.round((target - have) * 2) / 2;
       const out = $("#combos");
       if (!target) { out.innerHTML = `<p class="hint">Спершу вкажіть ліміт кредитів для цього семестру вгорі.</p>`; return; }
@@ -15,6 +34,7 @@
       const maxK = Math.max(1, Math.min(5, +$("#c-max").value || 3));
       const results = [];
       const opts = pool.flatMap(c => c.credit_options.map(v => ({ c, v })));
+      // Bounded DFS over opts[start..]: chosen is the current partial set, sum its credits
       (function dfs(start, sum, chosen) {
         if (sum === need) { results.push(chosen.slice()); return; }
         if (chosen.length >= maxK || results.length > 4000) return;
@@ -25,6 +45,7 @@
           chosen.push(o); dfs(i + 1, sum + o.v, chosen); chosen.pop();
         }
       })(0, 0, []);
+      // Ranking helpers: mean rating and number of department-recommended courses
       const score = r => r.reduce((a, x) => a + x.c.rating, 0) / r.length;
       const recN = r => r.filter(x => recommended.has(x.c.id)).length;
       results.sort((a, b) => a.length - b.length || recN(b) - recN(a) || score(b) - score(a));
@@ -36,6 +57,7 @@
           : `<p class="hint">Точної комбінації немає. Дозвольте більше курсів у наборі, позначте більше ★ або послабте фільтри.</p>`);
     }
     $("#c-run").addEventListener("click", runCombos);
+    // Add a found set to the current plan, or create a new variant = current basket + the set
     $("#combos").addEventListener("click", e => {
       const sem = $("#c-sem").value;
       const k = e.target.dataset.comboNew;

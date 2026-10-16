@@ -1,9 +1,17 @@
-    // ---------- розмітка ----------
+    // ---------- Markup ----------
+    // Credit values offered by at least 5 courses become credit filter chips.
     const creditCounts = {};
     COURSES.forEach(c => c.credit_options.forEach(v => creditCounts[v] = (creditCounts[v] || 0) + 1));
     const creditValues = Object.keys(creditCounts).map(Number).filter(v => creditCounts[v] >= 5).sort((a, b) => a - b);
+    /**
+     * Markup for a group of toggle chips bound to a filter key in S.
+     * @param {string} key Filter key in S (array-valued, e.g. "credits").
+     * @param {Array<[string|number, string]>} items [value, label] pairs.
+     * @returns {string} HTML.
+     */
     const chipsHTML = (key, items) => `<div class="chips" data-chips="${key}">${items.map(([v, l]) => `<button class="chip" data-v="${v}">${l}</button>`).join("")}</div>`;
 
+    // Static app shell; dynamic parts are filled in by render*() functions.
     root.innerHTML = `
       <header class="top">
         <div class="brand"><span class="logo">В</span><div><b>Вибіркові</b><small id="meta"></small></div></div>
@@ -28,15 +36,18 @@
       </header>
 
       <section id="view-catalog">
-        <div class="filterbar">
-          <div class="search"><span aria-hidden="true">⌕</span><input id="q" type="search" placeholder="Назва, викладач, зміст…" autocomplete="off"><kbd>/</kbd></div>
-          <div class="pills">
+        <div class="filterbar"><div class="fb-inner">
+          <div class="fb-search">
+            <div class="search"><span aria-hidden="true">⌕</span><input id="q" type="search" placeholder="Назва, викладач, зміст…" autocomplete="off"><kbd>/</kbd></div>
+            <button class="fb-toggle" id="fb-toggle" aria-expanded="false" aria-controls="fb-pills">Фільтри<span id="fb-count"></span></button>
+          </div>
+          <div class="pills" id="fb-pills"><div class="pill-row">
             <select id="f-lang" class="pill" aria-label="Мова викладання"><option value="">Мова викладання</option><option value="uk">Українська</option><option value="en">Англійська</option></select>
             <select id="f-dep" class="pill" aria-label="Підрозділ, кафедра, відділ, центр"><option value="">Підрозділ, кафедра</option>${D.options.departments.map(d => `<option value="${d.id}">${d.sub ? "   " : ""}${esc(d.name)}</option>`).join("")}</select>
             <select id="f-major" class="pill" aria-label="Галузь знань і спеціальність"><option value="">Галузь знань і спеціальність</option>${D.options.majors.map(g => `<optgroup label="${esc(g.label)}">${g.items.map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join("")}</optgroup>`).join("")}</select>
             <select id="f-degree" class="pill" aria-label="Ступінь освіти"><option value="">Ступінь освіти</option>${Object.entries(DEGREE).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
             <select id="f-sem" class="pill" aria-label="Семестр, в якому читається"><option value="">Семестр</option>${Object.entries(SEM).map(([k, v]) => `<option value="${k}">${v} (${k === "fall" ? "непарний" : "парний"})</option>`).join("")}</select>
-            <span class="sep"></span>
+            </div><div class="pill-row">
             <details class="pop" data-pop="credits"><summary class="pill">Кредити</summary><div class="pop-panel">${chipsHTML("credits", creditValues.map(v => [v, v]))}</div></details>
             <details class="pop" data-pop="control"><summary class="pill">Контроль</summary><div class="pop-panel">${chipsHTML("control", [["exam", "Екзамен"], ["credit", "Залік"], ["diff_credit", "Диф. залік"]])}</div></details>
             <details class="pop" data-pop="year"><summary class="pill">Рік навчання</summary><div class="pop-panel">${chipsHTML("year", [1, 2, 3, 4, 5, 6].map(y => [y, y + (y > 4 ? " (маг.)" : "") + " рік"]))}</div></details>
@@ -50,18 +61,21 @@
               <label class="lbl" for="mandatory">${env.live ? "Додати назви вручну" : "Мої обов’язкові (по одній на рядок)"}</label>
               <textarea id="mandatory" placeholder="Вища математика&#10;Програмування"></textarea>
             </div></details>
-          </div>
-        </div>
+          </div></div>
+        </div></div>
         <div class="resultbar">
-          <span class="count" id="count"></span>
-          <button class="pill quiet" id="all-to-ai" title="Додати всі знайдені курси до списку для ШІ">✨ Знайдені → ШІ</button>
+          <div class="rb-main">
+            <span class="count" id="count"></span>
+            <span class="spacer"></span>
+            <button class="rb-btn" id="all-to-ai" title="Додати всі знайдені курси до списку для ШІ">✨ Знайдені → у список ШІ</button>
+            <label class="rb-sort"><span>Сортувати</span>
+              <select id="sort" class="pill" aria-label="Сортування">
+                <option value="smart">рекомендовані спершу</option><option value="rating">рейтинг</option>
+                <option value="name">назва</option><option value="credits">кредити</option><option value="year">рік навчання</option>
+              </select></label>
+            <div class="seg" role="group" aria-label="Вигляд"><button data-view="list" title="Список" aria-label="Список">☰</button><button data-view="table" title="Таблиця" aria-label="Таблиця">▦</button></div>
+          </div>
           <div id="active" class="active-chips"></div>
-          <span class="spacer"></span>
-          <select id="sort" class="pill quiet" aria-label="Сортування">
-            <option value="smart">Рекомендовані, потім рейтинг</option><option value="rating">За рейтингом</option>
-            <option value="name">За назвою</option><option value="credits">За кредитами</option><option value="year">За роком навчання</option>
-          </select>
-          <div class="seg" role="group" aria-label="Вигляд"><button data-view="list" title="Список">☰</button><button data-view="table" title="Таблиця">▦</button></div>
         </div>
         <div id="list" class="content"></div>
         <button class="more-btn" id="more"></button>

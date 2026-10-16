@@ -1,4 +1,5 @@
-/* ===== Кнопки ===== */
+/* Base controls: buttons (primary/ghost/link variants), focus ring and form inputs. */
+/* ===== Buttons ===== */
 .el-app button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 6px 12px; }
 .el-app button:hover { border-color: var(--muted); }
 .el-app button:disabled { opacity: .45; cursor: default; }

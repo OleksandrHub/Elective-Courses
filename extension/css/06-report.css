@@ -1,4 +1,6 @@
-/* ===== Звіт ===== */
+/* Report tab: heading, semester tabs, summary tiles (exam/zalik counts),
+   per-semester sections and course-type labels. */
+/* ===== Report ===== */
 .report-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; margin: 18px 0 14px; }
 .report-head h1 { font-size: 28px; letter-spacing: -.03em; }
 .report-head p { margin: 4px 0 0; }
