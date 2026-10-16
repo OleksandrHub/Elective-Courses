@@ -10,3 +10,10 @@
 .el-app input[type=number], .el-app input[type=search], .el-app textarea, .el-app select {
   font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 9px; }
 .el-app textarea { width: 100%; min-height: 90px; resize: vertical; }
+
+/* The app is its own scroll container (the overlay host does not scroll), so the
+   scrollbar can use theme colours. Nested scroll areas get the same thin themed bar. */
+.el-app { height: 100vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--scroll-thumb) var(--paper); }
+.el-app * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+/* Themed native checkboxes and radios. */
+.el-app input[type=checkbox], .el-app input[type=radio] { accent-color: var(--amber); width: 16px; height: 16px; margin: 0; flex: none; }

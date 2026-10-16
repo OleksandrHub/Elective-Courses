@@ -59,7 +59,7 @@
     document.documentElement.style.overflow = "hidden";
     if (host) { host.style.display = "block"; return; }
     host = document.createElement("div");
-    host.style.cssText = "position:fixed;inset:0;z-index:2147483000;overflow:auto;display:block";
+    host.style.cssText = "position:fixed;inset:0;z-index:2147483000;overflow:hidden;display:block";
     const shadow = host.attachShadow({ mode: "open" });
     const link = document.createElement("link");
     link.rel = "stylesheet";

@@ -44,3 +44,5 @@
 .el-app .ai-li .ghost { padding: 0 6px; }
 .ai-lists .row { grid-column: 1 / -1; }
 @media (max-width: 760px) { .ai-lists { grid-template-columns: 1fr; } }
+/* "Clear list" action under the two AI lists: aligned with the list edge. */
+.el-app .ai-lists > .row .ghost { padding-left: 0; }

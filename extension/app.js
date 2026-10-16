@@ -1271,7 +1271,7 @@
             ${variants.length > 1 ? `<div class="vtabs" style="margin:6px 0 4px">${variants.map(v => `<button class="vtab ${v.id === activeVariant ? "on" : ""}" data-vsel="${v.id}">${esc(v.name)}</button>`).join("")}</div>` : ""}
             <p class="hint">${st ? `${esc(st.speciality)} · ${st.courseYear || "?"} курс, група ${esc(st.group)}${st.planName ? ` · план ${esc(st.planName)}` : ""}. Дані з «Індивідуального навчального плану», вкладок вибіркових і вашого плану.`
               : account ? "Обов’язкові — з вашого акаунта, вибіркові — з плану і вкладки «Обрані мною»." : "Тут лише вибіркові з плану. Через розширення на dl.tntu.edu.ua сюди додаються дані з акаунта."}</p></div>
-          <div class="row"><button id="rep-copy">Копіювати для Excel</button><button id="rep-print">Друк</button></div>
+          <div class="row"><button class="rb-btn" id="rep-copy">⧉ Копіювати для Excel</button><button class="rb-btn" id="rep-print">⎙ Друк</button></div>
         </div>
         <div class="semtabs">
           ${preset("plan", "Наступний рік (план)")}${preset("cur", "Поточний семестр")}${preset("past", "Завершені")}${preset("all", "Усі")}
@@ -1287,9 +1287,11 @@
           const hasCw = rows.some(r => r.termpaper);
           return `<section class="rsem ${e.past ? "past" : ""}">
             <div class="rsem-head"><h2>${esc(e.label)}${e.sub ? ` <span>${e.sub}</span>` : ""}</h2>
-              <span class="hint">${cs?.total ? `за планом ${fmt(cs.total)} кр.${cs.electiveCredits ? `, з них вибіркових ${fmt(cs.electiveCredits)}` : ""}` : ""}${p && +p.target ? ` · у моєму плані ${fmt(planSum(p))} з ${fmt(+p.target)} кр.` : ""}</span></div>
+              <span class="hint">${[cs?.total ? `за планом ${fmt(cs.total)} кр.${cs.electiveCredits ? `, з них вибіркових ${fmt(cs.electiveCredits)}` : ""}` : "",
+                p && +p.target ? `у моєму плані ${fmt(planSum(p))} з ${fmt(+p.target)} кр.` : ""].filter(Boolean).join(" · ")}</span></div>
             <div class="tiles">${tilesHTML(t)}</div>
-            ${rows.length ? `<div class="tbl-wrap"><table class="tbl">
+            ${rows.length ? `<div class="tbl-wrap"><table class="tbl rep">
+              <colgroup><col><col class="c-type"><col class="c-cr"><col class="c-ctl">${hasCw ? `<col class="c-cw">` : ""}${hasGrade ? `<col class="c-grade">` : ""}</colgroup>
               <thead><tr><th>Дисципліна</th><th>Тип</th><th class="num">Кредити</th><th>Контроль</th>${hasCw ? "<th>Курсова</th>" : ""}${hasGrade ? "<th>Оцінка</th>" : ""}</tr></thead>
               <tbody>${rows.map(r => `<tr class="t-${r.type}"><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a>` : esc(r.name)}</td>
                 <td><span class="type ${r.type}">${TYPE[r.type]}</span></td><td class="num">${fmt(r.credits)}</td>

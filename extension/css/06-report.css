@@ -5,7 +5,7 @@
 .report-head h1 { font-size: 28px; letter-spacing: -.03em; }
 .report-head p { margin: 4px 0 0; }
 .semtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
-.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .tile { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
 .tile b { display: block; font-size: 28px; letter-spacing: -.03em; line-height: 1.1; }
 .tile span { color: var(--muted); font-size: 12.5px; }
@@ -23,4 +23,13 @@
 .type.mand { background: var(--sunken); color: var(--muted); }
 .type.plan { background: var(--amber-soft); color: var(--warn); }
 .type.site { background: var(--zalik-soft); color: var(--zalik); }
-@media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .tiles { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); } .tile { padding: 10px 12px; } .tile b { font-size: 22px; } }
+/* Report tables: same column widths in every semester; scroll horizontally on phones. */
+.tbl.rep { table-layout: fixed; min-width: 900px; }
+.tbl.rep col.c-type { width: 210px; }
+.tbl.rep col.c-cr { width: 90px; }
+.tbl.rep col.c-ctl { width: 200px; }
+.tbl.rep col.c-cw { width: 90px; }
+.tbl.rep col.c-grade { width: 170px; }
+.tbl.rep td:first-child { overflow-wrap: anywhere; }
+.report-head .row { flex: none; }
