@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Збирає всі вибіркові дисципліни ТНТУ разом з даними із силабусів.
 
-Результат: courses.json і data.js (для index.html).
+Результат: extension/courses.json (для розширення) і extension/data.js (для index.html).
+Стандартні фільтри сайту (мова, підрозділ, спеціальність, ступінь, семестр) знімаються
+запитами до самого сайту, тож працюють так само, як там.
 Запуск: python3 scrape.py
 """
 import html as htmllib
@@ -9,18 +11,20 @@ import json
 import re
 import sys
 import time
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 BASE = "https://dl.tntu.edu.ua"
-LIST_URL = BASE + "/mods/elective_courses/all.php?&l=any&department=-1&major=0&degree=all&semester=all&search=&fetch-all=1&p={}"
+LIST_PARAMS = {"l": "any", "department": "-1", "major": "0", "degree": "all", "semester": "all", "search": ""}
 SYL_URL = BASE + "/mods/syllabus/view.php?json=1&sid={}"
-OUT = Path(__file__).resolve().parent
-CACHE = OUT / "cache"
+ROOT = Path(__file__).resolve().parent
+OUT = ROOT / "extension"
+CACHE = ROOT / "cache"
 
 
-def get(url, retries=3):
+def get(url, retries=6):
     for i in range(retries):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 electives-helper"})
@@ -29,7 +33,7 @@ def get(url, retries=3):
         except Exception as e:
             if i == retries - 1:
                 raise
-            time.sleep(2 * (i + 1))
+            time.sleep(3 * (i + 1))
 
 
 def text(s):
@@ -64,16 +68,31 @@ def parse_rows(page_html):
     return rows
 
 
-def fetch_list():
-    first = json.loads(get(LIST_URL.format(1)))
-    total = first["num_total"]
-    pages = max(int(p) for p in re.findall(r"p=(\d+)", first["html"]) or ["1"])
+def list_url(page, **filters):
+    params = {**LIST_PARAMS, **filters, "fetch-all": 1, "p": page}
+    return BASE + "/mods/elective_courses/all.php?&" + urllib.parse.urlencode(params)
+
+
+def fetch_list(**filters):
+    """Усі рядки списку з урахуванням фільтрів сайту."""
+    first = json.loads(get(list_url(1, **filters)))
+    pages = max([int(p) for p in re.findall(r"p=(\d+)", first["html"])] or [1])
     rows = parse_rows(first["html"])
     for p in range(2, pages + 1):
-        rows += parse_rows(json.loads(get(LIST_URL.format(p)))["html"])
-        print(f"  сторінка {p}/{pages}", file=sys.stderr)
-    print(f"Курсів у списку: {len(rows)} (сайт каже {total})", file=sys.stderr)
-    return rows
+        rows += parse_rows(json.loads(get(list_url(p, **filters)))["html"])
+    return rows, first["num_total"]
+
+
+def filter_ids(param, value):
+    """ID курсів, які сайт показує для одного значення фільтра (з кешем)."""
+    f = CACHE / "filters" / f"{param}={value}.json"
+    if f.exists():
+        return json.loads(f.read_text())
+    rows, _ = fetch_list(**{param: value})
+    ids = [r["id"] for r in rows]
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(ids))
+    return ids
 
 
 def fetch_syllabus(sid):
@@ -135,25 +154,57 @@ def enrich(row, s):
 
 
 def fetch_options():
-    """Назви кафедр і спеціальностей із фільтрів сторінки."""
+    """Значення стандартних фільтрів сайту, з тією ж структурою, що й там."""
     page = get(BASE + "/mods/elective_courses/all.php")
-    def opts(name):
+
+    def select(name):
         m = re.search(r'<select name="%s".*?</select>' % name, page, re.S)
-        return {int(v): text(t) for v, t in re.findall(r'<option value="(\d+)"[^>]*>(.*?)</option>', m.group(0))} if m else {}
-    return {"departments": opts("department"), "majors": opts("major")}
+        return m.group(0) if m else ""
+
+    departments = []
+    for v, t in re.findall(r'<option value="(\d+)"[^>]*>(.*?)</option>', select("department")):
+        departments.append({"id": int(v), "name": text(t), "sub": t.startswith("&nbsp;")})
+    majors = []
+    for label, body in re.findall(r'<optgroup label="([^"]*)">(.*?)</optgroup>', select("major"), re.S):
+        items = [{"id": int(v), "name": text(t)} for v, t in re.findall(r'<option value="(\d+)"[^>]*>(.*?)</option>', body)]
+        majors.append({"label": htmllib.unescape(label), "items": items})
+    return {"departments": departments, "majors": majors}
+
+
+def site_filters(options):
+    """Для кожного курсу: за яких значень стандартних фільтрів сайт його показує."""
+    jobs = [("l", "uk"), ("l", "en"), ("degree", "bachelor"), ("degree", "master"), ("degree", "phd"),
+            ("semester", "fall"), ("semester", "spring")]
+    jobs += [("department", d["id"]) for d in options["departments"]]
+    jobs += [("major", m["id"]) for g in options["majors"] for m in g["items"]]
+    print(f"Знімаю стандартні фільтри сайту ({len(jobs)} значень)…", file=sys.stderr)
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        results = list(ex.map(lambda j: filter_ids(*j), jobs))
+    key = {"l": "site_lang", "degree": "degrees", "semester": "site_sems", "department": "deps", "major": "majors"}
+    per_course = {}
+    for (param, value), ids in zip(jobs, results):
+        for cid in ids:
+            per_course.setdefault(cid, {}).setdefault(key[param], []).append(value)
+    return per_course
 
 
 def main():
-    rows = fetch_list()
+    rows, total = fetch_list()
+    print(f"Курсів у списку: {len(rows)} (сайт каже {total})", file=sys.stderr)
     sids = [r["sid"] for r in rows if r["sid"]]
     print(f"Завантажую {len(sids)} силабусів…", file=sys.stderr)
     with ThreadPoolExecutor(max_workers=6) as ex:
         syl = dict(zip(sids, ex.map(fetch_syllabus, sids)))
     courses = [enrich(r, syl.get(r["sid"])) for r in rows]
-    data = {"fetched": time.strftime("%Y-%m-%d %H:%M"), "options": fetch_options(), "courses": courses}
-    (OUT / "courses.json").write_text(json.dumps(data, ensure_ascii=False, indent=1))
+    options = fetch_options()
+    sf = site_filters(options)
+    for c in courses:
+        c.update({"site_lang": [], "degrees": [], "site_sems": [], "deps": [], "majors": [], **sf.get(c["id"], {})})
+    data = {"fetched": time.strftime("%Y-%m-%d %H:%M"), "options": options, "courses": courses}
+    OUT.mkdir(exist_ok=True)
+    (OUT / "courses.json").write_text(json.dumps(data, ensure_ascii=False))
     (OUT / "data.js").write_text("window.ELECTIVES = " + json.dumps(data, ensure_ascii=False) + ";\n")
-    print(f"Готово: {len(courses)} курсів → courses.json, data.js", file=sys.stderr)
+    print(f"Готово: {len(courses)} курсів → extension/courses.json, extension/data.js", file=sys.stderr)
 
 
 if __name__ == "__main__":

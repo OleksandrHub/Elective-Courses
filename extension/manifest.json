@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Вибіркові ТНТУ — розумний підбір",
+  "version": "1.0.0",
+  "description": "Фільтри за кредитами, формою контролю й роком навчання, урахування обов’язкових дисциплін з акаунта і підбір комбінацій кредитів на dl.tntu.edu.ua.",
+  "content_scripts": [
+    {
+      "matches": ["https://dl.tntu.edu.ua/mods/elective_courses/*"],
+      "js": ["app.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["style.css", "courses.json"],
+      "matches": ["https://dl.tntu.edu.ua/*"]
+    }
+  ]
+}
