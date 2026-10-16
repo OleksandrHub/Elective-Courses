@@ -614,6 +614,29 @@
 
     // ---------- звіт ----------
     const curSem = n => (account?.curriculum?.semesters || []).find(x => x.num === n);
+    // Семестр плану з номером: 7 → {key: "s7", label: "7 семестр (осінь)", …}
+    const semEntry = (num, target = "") => ({ key: "s" + num, num, label: `${num} семестр (${num % 2 ? "осінь" : "весна"})`,
+      short: `${num} сем`, parity: num % 2 ? "fall" : "spring", target });
+    // Замінити семестри плану й перенести курси всіх варіантів (за ключем, інакше — за осінь/весна)
+    function setPlanSemesters(newPlan) {
+      const old = plan;
+      plan = newPlan;
+      curVariant().basket = basket;
+      for (const v of variants) v.basket.forEach(x => {
+        if (plan.some(p => p.key === x.sem)) return;
+        const par = old.find(p => p.key === x.sem)?.parity;
+        x.sem = (plan.find(p => p.parity === par) || plan[0]).key;
+      });
+      save();
+    }
+    // Якщо «Обрані мною» не дали номерів, беремо наступний навчальний рік з навчального плану:
+    // поточний 5 або 6 семестр → обираємо на 7 (осінь) і 8 (весна)
+    function numberPlanSemesters() {
+      const cur = account?.curriculum?.current;
+      if (!cur || plan.every(p => p.num)) return;
+      const fall = cur % 2 ? cur + 2 : cur + 1;
+      setPlanSemesters(plan.map(p => p.num ? p : semEntry(p.parity === "fall" ? fall : fall + 1, p.target)));
+    }
     function reportSemesters() {
       if (account) {
         const cur = account.curriculum;
@@ -624,7 +647,7 @@
           return { key: p ? p.key : "s" + n, num: n, parity: n % 2 ? "fall" : "spring", label: `${n} семестр`,
             sub: (n % 2 ? "осінь" : "весна") + (cur?.current === n ? " · поточний" : cur?.current > n ? " · завершено" : ""),
             inPlan: !!p, current: cur?.current === n, past: cur?.current > n };
-        });
+        }).concat(plan.filter(p => !p.num).map(p => ({ key: p.key, num: null, parity: p.parity, label: p.label, sub: "семестр не визначено", inPlan: true })));
       }
       return plan.map(p => ({ key: p.key, num: null, parity: p.parity, label: p.label, sub: "", inPlan: true }));
     }
@@ -1076,16 +1099,8 @@ ${pool.map(line).join("\n")}`;
         account = { ...acc, at: new Date().toLocaleString("uk-UA", { dateStyle: "short", timeStyle: "short" }) };
         account.majorId = guessMajor(account.speciality);
         store.set("account", account);
-        if (account.plan?.length) {
-          const old = plan;
-          plan = account.plan.map(p => ({ key: "s" + p.num, num: p.num, label: `${p.num} семестр (${p.num % 2 ? "осінь" : "весна"})`,
-            short: `${p.num} сем`, parity: p.num % 2 ? "fall" : "spring", target: String(p.left) }));
-          basket.forEach(x => {
-            if (plan.some(p => p.key === x.sem)) return;
-            const par = old.find(p => p.key === x.sem)?.parity;
-            x.sem = (plan.find(p => p.parity === par) || plan[0]).key;
-          });
-        }
+        if (account.plan?.length) setPlanSemesters(account.plan.map(p => semEntry(p.num, String(p.left))));
+        else numberPlanSemesters();
         // «Мене цікавлять» з сайту → ★ (лише нові, щоб не повертати те, що ви прибрали)
         const imported = new Set(store.get("importedInterested", []));
         for (const r of account.interested || []) { const id = refId(r); if (id && !imported.has(id)) { stars.add(id); imported.add(id); } }
@@ -1116,6 +1131,7 @@ ${pool.map(line).join("\n")}`;
 
     $("#meta").textContent = `ТНТУ · ${COURSES.length} курсів · ${D.fetched.slice(0, 10)}`;
     rebuildAccount();
+    numberPlanSemesters();
     syncControls();
     render();
     if (env.live) loadAccount();

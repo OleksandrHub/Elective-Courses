@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Вибіркові ТНТУ — розумний підбір",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Фільтри за кредитами, формою контролю й роком навчання, урахування обов’язкових з акаунта, звіт по семестрах і ШІ-підбір через Gemini на dl.tntu.edu.ua.",
   "permissions": ["storage"],
   "host_permissions": ["https://generativelanguage.googleapis.com/*"],
