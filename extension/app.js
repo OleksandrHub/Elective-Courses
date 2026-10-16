@@ -47,7 +47,8 @@
     const DEFAULTS = { q: "", lang: "", dep: "", major: "", degree: "", sem: "", credits: [], control: [], year: [],
       nocw: false, star: false, rec: false, hideBlocked: true, hideSimilar: false, sort: "smart", view: "list" };
     const S = Object.assign({}, DEFAULTS, store.get("filters2", {}));
-    let tab = "catalog", reportSem = store.get("reportSem", "plan");
+    let tab = "catalog";
+    let reportSel = store.get("reportSel", null);   // ключі обраних семестрів звіту; null — «наступний рік» за замовчуванням
     let stars = new Set(store.get("stars", []));
     let aiList = new Set(store.get("aiList", []));     // список кандидатів для ШІ; осінь/весна — за тим, коли курс читається
     // Варіанти плану: у кожного свій набір курсів, ліміти семестрів спільні
@@ -701,15 +702,18 @@
     const gradeText = g => g && (g.zvo || g.ects || g.nat) ? [g.zvo, g.ects, g.nat].filter(Boolean).join(" · ") : "";
     function renderReport() {
       const sems = reportSemesters();
-      const sel = reportSem === "all" ? sems : reportSem === "plan" ? sems.filter(s => s.inPlan)
-        : reportSem === "cur" ? sems.filter(s => s.current) : reportSem === "past" ? sems.filter(s => s.past) : sems.filter(s => s.key === reportSem);
-      const shownSems = sel.length ? sel : sems;
+      const presets = {
+        plan: account ? sems.filter(s => s.inPlan) : [], cur: sems.filter(s => s.current), past: sems.filter(s => s.past), all: sems,
+      };
+      const chosen = new Set((reportSel || presets.plan.map(s => s.key)).filter(k => sems.some(s => s.key === k)));
+      const shownSems = chosen.size ? sems.filter(s => chosen.has(s.key)) : sems;
+      const isPreset = k => presets[k].length && presets[k].length === shownSems.length && presets[k].every(s => shownSems.includes(s));
       const blocks = shownSems.map(e => ({ e, rows: reportRows(e) }));
       const all = totals(blocks.flatMap(b => b.rows));
       const st = account?.curriculum?.student;
       const tile = (n, l, cls = "") => `<div class="tile ${cls}"><b>${n}</b><span>${l}</span></div>`;
       const tilesHTML = (t, total) => `${tile(fmt(t.credits), total ? "кредитів разом" : "кредитів")}${tile(t.exam, "екзаменів", "exam")}${tile(t.zalik + t.diff, "заліків" + (t.diff ? ` (${t.diff} диф.)` : ""), "zalik")}${tile(t.cw, "курсових")}${t.avg != null ? tile(t.avg.toFixed(1), "середній бал") : tile(t.n, "дисциплін")}`;
-      const chip = (k, l) => `<button class="chip ${reportSem === k ? "on" : ""}" data-rsem="${k}">${l}</button>`;
+      const preset = (k, l) => presets[k].length ? `<button class="chip preset ${isPreset(k) ? "on" : ""}" data-rpreset="${k}">${l}</button>` : "";
       $("#view-report").innerHTML = `
         <div class="report-head">
           <div><h1>Звіт по семестрах</h1>
@@ -719,11 +723,9 @@
           <div class="row"><button id="rep-copy">Копіювати для Excel</button><button id="rep-print">Друк</button></div>
         </div>
         <div class="semtabs">
-          ${account && sems.some(s => s.inPlan) ? chip("plan", "Наступний рік (план)") : ""}
-          ${sems.some(s => s.current) ? chip("cur", "Поточний семестр") : ""}
-          ${sems.some(s => s.past) ? chip("past", "Завершені") : ""}
-          <button class="chip ${reportSem === "all" || (!account && reportSem === "plan") ? "on" : ""}" data-rsem="all">Усі</button>
-          ${sems.map(s => chip(s.key, esc(s.label))).join("")}
+          ${preset("plan", "Наступний рік (план)")}${preset("cur", "Поточний семестр")}${preset("past", "Завершені")}${preset("all", "Усі")}
+          <span class="sep"></span>
+          ${sems.map(s => `<button class="chip sem ${shownSems.includes(s) ? "on" : ""}" data-rsem="${s.key}" aria-pressed="${shownSems.includes(s)}" title="Клік — додати або прибрати семестр">${esc(s.label)}</button>`).join("")}
         </div>
         ${blocks.length > 1 ? `<div class="tiles summary">${tilesHTML(all, true)}</div>` : ""}
         ${blocks.map(({ e, rows }) => {
@@ -750,7 +752,20 @@
     }
     $("#view-report").addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
-      if (b.dataset.rsem) { reportSem = b.dataset.rsem; store.set("reportSem", reportSem); render(); }
+      if (b.dataset.rpreset || b.dataset.rsem) {
+        const sems = reportSemesters();
+        const shown = [...b.closest(".semtabs").querySelectorAll(".chip.sem.on")].map(c => c.dataset.rsem);
+        if (b.dataset.rpreset) {
+          const p = b.dataset.rpreset;
+          reportSel = sems.filter(s => p === "all" || (p === "plan" && s.inPlan) || (p === "cur" && s.current) || (p === "past" && s.past)).map(s => s.key);
+        } else {
+          const k = b.dataset.rsem;
+          // якщо показано «усі», перший клік лишає лише цей семестр
+          reportSel = shown.length === sems.length ? [k] : shown.includes(k) ? shown.filter(x => x !== k) : [...shown, k];
+          if (!reportSel.length) reportSel = [k];
+        }
+        store.set("reportSel", reportSel); render();
+      }
       if (b.dataset.vsel) { switchVariant(b.dataset.vsel); return; }
       const blocks = window.__elReport || [];
       if (b.id === "rep-copy") {
