@@ -4,6 +4,7 @@
 //   env.live         — запущено на dl.tntu.edu.ua під акаунтом
 //   env.loadAccount  — async () => {speciality, mandatory[], plan[], selected[], selectedTitle, recommended[], interested[]}
 //   env.close        — закрити оверлей
+//   env.gemini       — {request, keyInfo, setKey}: запити до Gemini через розширення (інакше — напряму з ключем у localStorage)
 (function () {
   const CONTROL = { exam: "екзамен", credit: "залік", diff_credit: "диф. залік", none: "без контролю" };
   const CONTROL_SHORT = { exam: "Екз", credit: "Зал", diff_credit: "Диф", none: "—" };
@@ -118,6 +119,7 @@
         <nav class="tabs" role="tablist">
           <button role="tab" data-tab="catalog">Каталог</button>
           <button role="tab" data-tab="report">Звіт по семестрах</button>
+          <button role="tab" data-tab="ai">✨ ШІ-підбір</button>
         </nav>
         <div class="top-right">
           <div id="account" class="account"></div>
@@ -166,6 +168,27 @@
       </section>
 
       <section id="view-report" class="content" hidden></section>
+
+      <section id="view-ai" class="content" hidden>
+        <div class="ai">
+          <div class="report-head"><div><h1>✨ ШІ-підбір</h1>
+            <p class="hint">Gemini з вашого Google-акаунта переглядає доступні курси, ваші обов’язкові й побажання та пропонує набори, що закривають кредити семестру.</p></div></div>
+          <div class="card-box" id="ai-key"></div>
+          <div class="card-box">
+            <label class="lbl" for="ai-wish">Що вам цікаво і чого хочете уникнути</label>
+            <textarea id="ai-wish" placeholder="Напр.: цікавлять машинне навчання і стартапи, краще без екзаменів, англійською — теж ок"></textarea>
+            <div class="chips" id="ai-quick">${["Без екзаменів", "Без курсових", "Англійською", "Корисне для роботи в IT", "Найменше навантаження", "Пріоритет рекомендованим кафедрою", "Щось зовсім нове для мене"].map(t => `<button class="chip" data-q="${t}">+ ${t}</button>`).join("")}</div>
+            <div class="row" style="margin-top:12px">
+              <select id="ai-sem" class="pill" aria-label="Семестр"></select>
+              <label class="check" style="margin:0"><input type="checkbox" id="ai-filters"> Лише з поточних фільтрів каталогу</label>
+              <span class="spacer"></span>
+              <button class="primary big" id="ai-run">✨ Підібрати</button>
+            </div>
+            <p class="hint" style="margin:10px 0 0">У Google надсилається: спеціальність, назви ваших обов’язкових, побажання і перелік курсів. Логін, пароль та інші особисті дані — ні.</p>
+          </div>
+          <div id="ai-out"></div>
+        </div>
+      </section>
 
       <div id="drawer-back" class="drawer-back" hidden></div>
       <aside id="drawer" class="drawer" aria-label="Мій план">
@@ -340,8 +363,9 @@
     function render() {
       $("#view-catalog").hidden = tab !== "catalog";
       $("#view-report").hidden = tab !== "report";
+      $("#view-ai").hidden = tab !== "ai";
       $("#rec-pill").hidden = !recommended.size;
-      if (tab === "catalog") renderCatalog(); else renderReport();
+      if (tab === "catalog") renderCatalog(); else if (tab === "report") renderReport(); else renderAI();
       renderPlan(); renderPlanBtn(); renderCompareBar(); renderAccount();
     }
     function renderCatalog() {
@@ -593,6 +617,202 @@
             <tfoot><tr><td>Разом</td><td></td><td>${fmt(t.credits)}</td><td>${t.exam} екз / ${t.zalik + t.diff} зал</td><td>${t.cw}</td></tr></tfoot></table>`; }).join(""));
         w.document.close(); w.focus(); w.print();
       }
+    });
+
+    // ---------- ШІ-підбір (Gemini) ----------
+    const API = "https://generativelanguage.googleapis.com/v1beta/";
+    const gem = env.gemini || {
+      async request(url, method, body) {
+        const key = store.get("geminiKey", "");
+        if (!key) return { ok: false, status: 401, body: "Не вказано API-ключ Gemini" };
+        try {
+          const r = await fetch(url, { method: method || "GET", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body });
+          return { ok: r.ok, status: r.status, body: await r.text() };
+        } catch (e) { return { ok: false, status: 0, body: String(e) }; }
+      },
+      async keyInfo() { const k = store.get("geminiKey", ""); return { hasKey: !!k, hint: k ? "…" + k.slice(-4) : "" }; },
+      async setKey(k) { store.set("geminiKey", k || ""); return true; },
+    };
+    let aiModel = store.get("aiModel", ""), aiModels = store.get("aiModels", []), aiResult = null, aiBusy = false, aiError = "";
+    function apiError(res) {
+      let msg = res.body;
+      try { msg = JSON.parse(res.body).error?.message || msg; } catch {}
+      if (res.status === 400 && /api key/i.test(msg)) return "Ключ не прийнято — перевірте, що скопіювали його повністю.";
+      if (res.status === 429) return "Вичерпано ліміт запитів Gemini. Зачекайте хвилину або оберіть іншу модель.";
+      if (res.status === 401 || res.status === 403) return "Немає доступу до Gemini: " + msg;
+      return `Помилка Gemini (${res.status || "мережа"}): ${String(msg).slice(0, 300)}`;
+    }
+    async function loadModels() {
+      const res = await gem.request(API + "models?pageSize=200");
+      if (!res.ok) throw new Error(apiError(res));
+      const list = (JSON.parse(res.body).models || [])
+        .filter(m => (m.supportedGenerationMethods || []).includes("generateContent") && /gemini/i.test(m.name) && !/(tts|image|embedding|live|audio|robotics|computer)/i.test(m.name))
+        .map(m => ({ id: m.name.replace(/^models\//, ""), label: m.displayName || m.name }));
+      const ver = id => parseFloat((id.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || 0);
+      const rank = id => ver(id) * 10 + (/flash/.test(id) && !/lite/.test(id) ? 3 : /pro/.test(id) ? 2 : 1) - (/preview|exp/.test(id) ? 4 : 0);
+      list.sort((a, b) => rank(b.id) - rank(a.id));
+      aiModels = list; store.set("aiModels", list);
+      if (!list.some(m => m.id === aiModel)) { aiModel = list[0]?.id || ""; store.set("aiModel", aiModel); }
+    }
+
+    async function renderAIKey() {
+      const info = await gem.keyInfo();
+      const el = $("#ai-key");
+      if (!info.hasKey) {
+        el.innerHTML = `<b>Підключіть свій Gemini</b>
+          <ol class="steps"><li>Відкрийте <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> під своїм Google-акаунтом.</li>
+          <li>Натисніть «Create API key» — це безкоштовно.</li><li>Вставте ключ сюди. Він зберігається лише ${env.gemini ? "в розширенні у вашому браузері" : "у цьому браузері"}.</li></ol>
+          <div class="row"><input type="password" id="ai-key-in" placeholder="AIza…" autocomplete="off" style="flex:1;min-width:200px"><button class="primary" id="ai-key-save">Зберегти</button></div>
+          <div id="ai-key-msg" class="hint"></div>`;
+      } else {
+        if (!aiModels.length) { try { await loadModels(); } catch (e) { aiError = e.message; } }
+        el.innerHTML = `<div class="row"><span>🔑 Gemini підключено <span class="hint">(ключ ${esc(info.hint)})</span></span><span class="spacer"></span>
+          <label class="hint">Модель <select id="ai-model" class="pill quiet">${aiModels.map(m => `<option value="${esc(m.id)}" ${m.id === aiModel ? "selected" : ""}>${esc(m.label)}</option>`).join("") || `<option value="">—</option>`}</select></label>
+          <button class="ghost" id="ai-key-del">Відключити</button></div>`;
+      }
+      $("#ai-run").disabled = !info.hasKey || aiBusy;
+    }
+    $("#ai-key").addEventListener("click", async e => {
+      if (e.target.id === "ai-key-save") {
+        const key = $("#ai-key-in").value.trim();
+        if (!key) return;
+        $("#ai-key-msg").textContent = "Перевіряю ключ…";
+        await gem.setKey(key);
+        try { await loadModels(); aiError = ""; renderAIKey(); }
+        catch (err) { await gem.setKey(""); $("#ai-key-msg").textContent = err.message; }
+      }
+      if (e.target.id === "ai-key-del" && confirm("Відключити Gemini і видалити ключ з браузера?")) {
+        await gem.setKey(""); aiModels = []; store.set("aiModels", []); renderAIKey();
+      }
+    });
+    $("#ai-key").addEventListener("change", e => { if (e.target.id === "ai-model") { aiModel = e.target.value; store.set("aiModel", aiModel); } });
+    $("#ai-quick").addEventListener("click", e => {
+      const q = e.target.dataset.q; if (!q) return;
+      const t = $("#ai-wish");
+      t.value = (t.value.trim() ? t.value.trim().replace(/[.,;]?$/, "; ") : "") + q.toLowerCase();
+      store.set("aiWish", t.value);
+    });
+    $("#ai-wish").value = store.get("aiWish", "");
+    $("#ai-wish").addEventListener("input", e => store.set("aiWish", e.target.value));
+
+    function renderAI() {
+      const cur = $("#ai-sem").value;
+      $("#ai-sem").innerHTML = plan.map(p => { const t = +p.target || 0, left = t - planSum(p);
+        return `<option value="${p.key}">${esc(p.label)}${t ? ` — бракує ${fmt(Math.max(0, left))} кр.` : ""}</option>`; }).join("");
+      if (plan.some(p => p.key === cur)) $("#ai-sem").value = cur;
+      renderAIKey();
+      renderAIResult();
+    }
+
+    function aiPool(s) {
+      const takenNames = new Set(basket.map(x => norm(BY_ID.get(x.id)?.name)));
+      let pool = COURSES.filter(c => !inPlan(c) && !siteSelected.has(c.id) && !takenNames.has(norm(c.name)) && parities(c).has(s.parity) && !blockState(c)?.exact);
+      if ($("#ai-filters").checked) pool = pool.filter(c => matches(c, { ignoreSem: true }));
+      else if (S.major) pool = pool.filter(c => c.majors.includes(+S.major));   // лише доступні вашій спеціальності
+      return pool.sort(SORTS.smart).slice(0, 260);
+    }
+    async function runAI() {
+      const s = plan.find(p => p.key === $("#ai-sem").value) || plan[0];
+      const target = +s.target || 0, have = planSum(s);
+      const need = Math.round((target - have) * 2) / 2;
+      if (!target) { aiError = "Спершу вкажіть у «План» ліміт кредитів для цього семестру."; aiResult = null; return renderAIResult(); }
+      if (need <= 0) { aiError = `У цьому семестрі вже набрано ${fmt(have)} з ${fmt(target)} кр.`; aiResult = null; return renderAIResult(); }
+      const pool = aiPool(s);
+      if (!pool.length) { aiError = "Немає доступних курсів для цього семестру — послабте фільтри."; aiResult = null; return renderAIResult(); }
+      aiBusy = true; aiError = ""; aiResult = null; $("#ai-run").disabled = true; renderAIResult();
+      try {
+        if (!aiModel) await loadModels();
+        const line = c => [c.id, c.name, `кредити: ${c.credit_options.join(" або ")}`, `контроль: ${CONTROL[controlFor(c, s.parity)] || "?"}`,
+          `рік: ${c.year || "?"}`, `рейтинг: ${Math.round(c.rating)}`, recommended.has(c.id) ? "РЕКОМЕНДУЄ ВИПУСКОВА КАФЕДРА" : "", stars.has(c.id) ? "студент позначив ★" : "",
+          c.termpaper ? "є курсова" : "", c.lang === "en" ? "мова: англійська" : "", DEP_NAME[c.department] || "", c.objective ? "мета: " + c.objective.slice(0, 170) : ""].filter(Boolean).join(" | ");
+        const planned = basket.filter(x => x.sem === s.key).map(x => `${BY_ID.get(x.id).name} (${x.credits} кр.)`);
+        const mand = (account?.mandatory || []).map(m => m.name).concat(manualMandatory.split("\n").map(t => t.trim()).filter(Boolean));
+        const prompt = `Студент ТНТУ обирає вибіркові дисципліни.
+Спеціальність: ${account?.speciality || "не вказано"}.
+Семестр: ${s.label}. Треба добрати рівно ${fmt(need)} кредитів ЄКТС.
+${planned.length ? `Уже в плані цього семестру: ${planned.join("; ")}.` : ""}
+Обов’язкові дисципліни студента (не пропонуй курси, що дублюють їхній зміст): ${[...new Set(mand)].slice(0, 90).join("; ") || "невідомо"}.
+Побажання студента: ${$("#ai-wish").value.trim() || "немає, обери найкорисніше для спеціальності"}.
+
+Доступні курси (ID | назва | параметри):
+${pool.map(line).join("\n")}`;
+        const body = {
+          systemInstruction: { parts: [{ text: `Ти — академічний радник. Запропонуй 3 різні варіанти наборів вибіркових дисциплін.
+Правила: використовуй лише ID з переліку; сума кредитів у кожному варіанті має дорівнювати рівно потрібній кількості; для курсу з кількома варіантами кредитів обери один із них; не більше 5 курсів у варіанті; без двох курсів з однаковою назвою.
+Враховуй побажання студента, користь для спеціальності, рекомендації кафедри і позначки ★; уникай дублювання обов’язкових.
+Пиши українською, коротко: title до 6 слів, why до 30 слів, reason до 18 слів.` }] },
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.5, responseMimeType: "application/json",
+            responseSchema: { type: "OBJECT", required: ["summary", "options"], properties: {
+              summary: { type: "STRING" },
+              options: { type: "ARRAY", items: { type: "OBJECT", required: ["title", "why", "picks"], properties: {
+                title: { type: "STRING" }, why: { type: "STRING" },
+                picks: { type: "ARRAY", items: { type: "OBJECT", required: ["id", "credits", "reason"], properties: {
+                  id: { type: "INTEGER" }, credits: { type: "NUMBER" }, reason: { type: "STRING" } } } } } } } } },
+          },
+        };
+        const res = await gem.request(API + `models/${encodeURIComponent(aiModel)}:generateContent`, "POST", JSON.stringify(body));
+        if (!res.ok) throw new Error(apiError(res));
+        const data = JSON.parse(res.body);
+        const cand = data.candidates?.[0];
+        if (!cand) throw new Error("Gemini не дав відповіді" + (data.promptFeedback?.blockReason ? ` (${data.promptFeedback.blockReason})` : ""));
+        const text = (cand.content?.parts || []).filter(p => !p.thought).map(p => p.text || "").join("").replace(/^```(?:json)?|```$/g, "").trim();
+        const out = JSON.parse(text);
+        const poolIds = new Set(pool.map(c => c.id));
+        out.options = (out.options || []).map(o => {
+          const seen = new Set();
+          const picks = (o.picks || []).filter(p => poolIds.has(p.id) && !seen.has(p.id) && seen.add(p.id)).map(p => {
+            const c = BY_ID.get(p.id);
+            const credits = c.credit_options.includes(p.credits) ? p.credits : c.credit_options.reduce((a, v) => Math.abs(v - p.credits) < Math.abs(a - p.credits) ? v : a);
+            return { ...p, credits };
+          });
+          return { ...o, picks, sum: picks.reduce((a, p) => a + p.credits, 0) };
+        }).filter(o => o.picks.length);
+        aiResult = { sem: s.key, parity: s.parity, need, model: aiModel, ...out };
+      } catch (e) {
+        aiError = e.message || String(e);
+      }
+      aiBusy = false;
+      renderAI();
+    }
+    $("#ai-run").addEventListener("click", runAI);
+
+    function renderAIResult() {
+      const out = $("#ai-out");
+      if (aiBusy) { out.innerHTML = `<div class="card-box ai-wait"><span class="spin"></span>Gemini підбирає курси… зазвичай 5–30 секунд</div>`; return; }
+      if (aiError) { out.innerHTML = `<div class="card-box ai-err">${esc(aiError)}</div>`; return; }
+      if (!aiResult) { out.innerHTML = ""; return; }
+      const r = aiResult;
+      out.innerHTML = `${r.summary ? `<p class="ai-summary">${esc(r.summary)}</p>` : ""}
+        ${r.options.length ? r.options.map((o, i) => {
+          const allIn = o.picks.every(p => inPlan(BY_ID.get(p.id)));
+          const st = o.sum === r.need ? `<span class="flag ok">✓ рівно ${fmt(o.sum)} кр.</span>` : `<span class="flag warn">${fmt(o.sum)} з ${fmt(r.need)} кр.</span>`;
+          return `<article class="ai-opt">
+            <div class="ai-opt-head"><div><span class="ai-n">${i + 1}</span><b>${esc(o.title)}</b></div>${st}</div>
+            <p class="hint">${esc(o.why)}</p>
+            ${o.picks.map((p, j) => { const c = BY_ID.get(p.id), ctl = controlFor(c, r.parity), added = inPlan(c);
+              return `<div class="ai-pick">
+                <span class="ctl ${ctlClass(ctl)}">${CONTROL_SHORT[ctl] || "?"}</span>
+                <div><a href="${syllabusUrl(c)}" target="_blank" rel="noopener"><b>${esc(c.name)}</b></a>${recommended.has(c.id) ? " 🎓" : ""}
+                  <div class="hint">${esc(p.reason)}</div></div>
+                <b class="ai-cr">${p.credits}</b>
+                <button class="ic ${added ? "on" : ""}" data-ai-pick="${i}:${j}" title="${added ? "У плані" : "Додати в план"}">${added ? "✓" : "+"}</button>
+              </div>`; }).join("")}
+            <div class="row" style="margin-top:10px"><button class="add ${allIn ? "on" : ""}" data-ai-add="${i}" ${allIn ? "disabled" : ""}>${allIn ? "✓ Набір у плані" : "+ Додати весь набір"}</button></div>
+          </article>`;
+        }).join("") : `<div class="card-box">Gemini не запропонував коректних варіантів. Спробуйте ще раз або змініть побажання.</div>`}
+        <p class="hint">Модель: ${esc(r.model)}. ШІ може помилятись — перевіряйте силабуси перед заявою.</p>`;
+    }
+    $("#ai-out").addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b || !aiResult) return;
+      const add = p => { const c = BY_ID.get(p.id); if (c && !inPlan(c)) toggleBasket(c.id, p.credits, aiResult.sem); };
+      if (b.dataset.aiAdd != null) aiResult.options[+b.dataset.aiAdd].picks.forEach(add);
+      if (b.dataset.aiPick) {
+        const [i, j] = b.dataset.aiPick.split(":").map(Number), p = aiResult.options[i].picks[j];
+        inPlan(BY_ID.get(p.id)) ? toggleBasket(p.id) : add(p);
+      }
+      render();
     });
 
     // ---------- порівняння ----------

@@ -148,6 +148,13 @@
     return { speciality, mandatory, plan: [], selected: [], selectedTitle: "Обрані мною", recommended: [], interested: [], ...sel, ...int };
   }
 
+  // Gemini: запити йдуть через фоновий воркер, ключ лежить у сховищі розширення (сайт його не бачить)
+  const gemini = {
+    request: (url, method, body) => chrome.runtime.sendMessage({ type: "gemini-fetch", url, method, body }),
+    keyInfo: () => chrome.runtime.sendMessage({ type: "gemini-key-get" }),
+    setKey: key => chrome.runtime.sendMessage({ type: "gemini-key-set", key }),
+  };
+
   // ---------- оверлей ----------
   let host = null;
   const prevOverflow = document.documentElement.style.overflow;
@@ -175,7 +182,7 @@
     document.body.appendChild(host);
     try {
       const data = await fetch(chrome.runtime.getURL("courses.json")).then(r => r.json());
-      window.ElectivesApp.mount(app, data, { live: true, loadAccount, close });
+      window.ElectivesApp.mount(app, data, { live: true, loadAccount, close, gemini });
     } catch (e) {
       app.innerHTML = `<div class="loading">Не вдалося завантажити дані: ${e.message}</div>`;
     }
