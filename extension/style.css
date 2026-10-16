@@ -296,3 +296,8 @@ summary.pill[data-n]:not([data-n=""])::after { content: attr(data-n); font-size:
 .el-app .rules .chip::before { content: "○ "; }
 .el-app .rules .chip.on { border: 1px solid var(--zalik); background: var(--zalik-soft); color: var(--zalik); }
 .el-app .rules .chip.on::before { content: "✓ "; }
+.type.celec { background: var(--rec-soft); color: var(--rec); }
+.type.cw { background: var(--sunken); color: var(--ink); }
+.type.prac { background: var(--sunken); color: var(--muted); }
+.tbl td.grade { white-space: nowrap; font-weight: 600; }
+.rsem.past h2 { color: var(--muted); }

@@ -6,8 +6,8 @@
 //   env.close        — закрити оверлей
 //   env.gemini       — {request, keyInfo, setKey}: запити до Gemini через розширення (інакше — напряму з ключем у localStorage)
 (function () {
-  const CONTROL = { exam: "екзамен", credit: "залік", diff_credit: "диф. залік", none: "без контролю" };
-  const CONTROL_SHORT = { exam: "Екз", credit: "Зал", diff_credit: "Диф", none: "—" };
+  const CONTROL = { exam: "екзамен", credit: "залік", diff_credit: "диф. залік", none: "без контролю", cw: "курсова робота", cp: "курсовий проєкт" };
+  const CONTROL_SHORT = { exam: "Екз", credit: "Зал", diff_credit: "Диф", none: "—", cw: "КР", cp: "КП" };
   const LANG = { uk: "українська", en: "англійська" };
   const KIND = { elective: "вибіркова", mandatory: "обов’язкова для своєї ОП (для інших — вибіркова)" };
   const DEGREE = { bachelor: "Бакалавр", master: "Магістр", phd: "Доктор філософії" };
@@ -68,11 +68,21 @@
 
     // ---------- дані акаунта ----------
     let mandatoryIds = new Set(), mandatoryNames = [], siteSelected = new Map(), recommended = new Set();
+    let takenIds = new Map(), takenNames = new Map();   // з навчального плану: id/назва → семестр
+    const isCw = r => r.control === "cw" || r.control === "cp";
     const refId = r => r.id && BY_ID.has(r.id) ? r.id : BY_SID.get(r.sid)?.id;
     function rebuildAccount() {
       const fromAcc = account?.mandatory || [];
+      takenIds = new Map(); takenNames = new Map();
+      for (const sem of account?.curriculum?.semesters || []) for (const r of sem.rows) {
+        if (isCw(r)) continue;
+        r.ids.forEach(id => takenIds.has(id) || takenIds.set(id, sem.num));
+        takenNames.has(norm(r.name)) || takenNames.set(norm(r.name), sem.num);
+      }
       mandatoryIds = new Set(fromAcc.map(m => m.id));
-      mandatoryNames = [...new Set([...fromAcc.map(m => m.name), ...manualMandatory.split("\n").map(s => s.trim()).filter(Boolean)])];
+      mandatoryNames = [...new Set([...fromAcc.map(m => m.name),
+        ...(account?.curriculum?.semesters || []).flatMap(sem => sem.rows.filter(r => !isCw(r)).map(r => r.name)),
+        ...manualMandatory.split("\n").map(s => s.trim()).filter(Boolean)])];
       siteSelected = new Map((account?.selected || []).map(x => [x.id, x]));
       recommended = new Set((account?.recommended || []).map(refId).filter(Boolean));
       blockCache.clear();
@@ -81,9 +91,10 @@
     function blockState(c) {
       if (blockCache.has(c.id)) return blockCache.get(c.id);
       let res = null;
-      if (mandatoryIds.has(c.id)) res = { exact: true, match: c.name };
+      const n = norm(c.name);
+      if (takenIds.has(c.id) || takenNames.has(n)) res = { exact: true, match: c.name, taken: takenIds.get(c.id) || takenNames.get(n) };
+      else if (mandatoryIds.has(c.id)) res = { exact: true, match: c.name };
       else {
-        const n = norm(c.name);
         for (const m of mandatoryNames) {
           const mn = norm(m);
           if (!mn) continue;
@@ -319,7 +330,7 @@
       const b = blockState(c), out = [];
       if (recommended.has(c.id)) out.push(`<span class="flag rec">🎓 рекомендує кафедра</span>`);
       if (siteSelected.has(c.id)) out.push(`<span class="flag ok">✓ обрано на сайті</span>`);
-      if (b) out.push(`<span class="flag warn">${b.exact ? (mandatoryIds.has(c.id) ? "ваша обов’язкова" : "= обов’язкова") : `≈ «${esc(b.match)}»`}</span>`);
+      if (b) out.push(`<span class="flag warn">${b.taken ? `уже у вашому плані · ${b.taken} сем` : b.exact ? (mandatoryIds.has(c.id) ? "ваша обов’язкова" : "= обов’язкова") : `≈ «${esc(b.match)}»`}</span>`);
       if (basket.some(x => x.id !== c.id && norm(BY_ID.get(x.id)?.name) === norm(c.name))) out.push(`<span class="flag warn">така назва вже в плані</span>`);
       if (c.termpaper) out.push(`<span class="flag">курсова</span>`);
       return out.join("");
@@ -528,73 +539,112 @@
     });
 
     // ---------- звіт ----------
+    const curSem = n => (account?.curriculum?.semesters || []).find(x => x.num === n);
     function reportSemesters() {
       if (account) {
-        const nums = new Set([...(account.mandatory || []).map(m => m.semester), ...plan.map(p => p.num), ...(account.selected || []).map(x => x.semester)].filter(Boolean));
+        const cur = account.curriculum;
+        const nums = new Set([...(cur?.semesters || []).map(x => x.num), ...(account.mandatory || []).map(m => m.semester),
+          ...plan.map(p => p.num), ...(account.selected || []).map(x => x.semester)].filter(Boolean));
         return [...nums].sort((a, b) => a - b).map(n => {
           const p = plan.find(x => x.num === n);
-          return { key: p ? p.key : "s" + n, num: n, parity: n % 2 ? "fall" : "spring", label: `${n} семестр`, sub: n % 2 ? "осінь" : "весна", inPlan: !!p };
+          return { key: p ? p.key : "s" + n, num: n, parity: n % 2 ? "fall" : "spring", label: `${n} семестр`,
+            sub: (n % 2 ? "осінь" : "весна") + (cur?.current === n ? " · поточний" : cur?.current > n ? " · завершено" : ""),
+            inPlan: !!p, current: cur?.current === n, past: cur?.current > n };
         });
       }
       return plan.map(p => ({ key: p.key, num: null, parity: p.parity, label: p.label, sub: "", inPlan: true }));
     }
+    const courseUrl = (id, sid) => sid ? `https://dl.tntu.edu.ua/mods/syllabus/view.php?sid=${sid}`
+      : BY_ID.get(id)?.sid ? `https://dl.tntu.edu.ua/mods/syllabus/view.php?sid=${BY_ID.get(id).sid}`
+      : id ? `https://dl.tntu.edu.ua/bounce.php?course=${id}` : "";
     function reportRows(e) {
-      const rows = [];
-      for (const m of account?.mandatory || []) if (m.semester === e.num)
-        rows.push({ type: "mand", name: m.name, credits: m.credits || 0, control: m.control, termpaper: !!m.termpaper, sid: m.sid });
-      for (const x of basket.filter(x => x.sem === e.key)) {
-        const c = BY_ID.get(x.id); if (!c) continue;
-        rows.push({ type: "plan", name: c.name, credits: x.credits, control: controlFor(c, e.parity), termpaper: !!c.termpaper, sid: c.sid });
+      const rows = [], seen = new Set();
+      const cs = curSem(e.num);
+      if (cs) {
+        for (const r of cs.rows) {
+          r.ids.forEach(id => seen.add(id));
+          rows.push({ type: isCw(r) ? "cw" : r.kind === "elec" ? "celec" : "mand", name: r.name, credits: r.credits || 0, control: r.control,
+            url: courseUrl(r.ids[0]), grade: r.grade, hours: r });
+        }
+        for (const p of cs.practice) rows.push({ type: "prac", name: p.name + (p.term ? ` (${p.term})` : ""), credits: p.credits || 0, control: null, grade: p.grade });
+      } else {
+        for (const m of account?.mandatory || []) if (m.semester === e.num) {
+          seen.add(m.id);
+          rows.push({ type: "mand", name: m.name, credits: m.credits || 0, control: m.control, termpaper: !!m.termpaper, url: courseUrl(m.id, m.sid) });
+        }
       }
-      for (const x of account?.selected || []) if (x.semester === e.num && !basket.some(b => b.id === x.id)) {
+      for (const x of basket.filter(x => x.sem === e.key)) {
+        const c = BY_ID.get(x.id); if (!c || seen.has(c.id)) continue;
+        seen.add(c.id);
+        rows.push({ type: "plan", name: c.name, credits: x.credits, control: controlFor(c, e.parity), termpaper: !!c.termpaper, url: courseUrl(c.id, c.sid) });
+      }
+      for (const x of account?.selected || []) if (x.semester === e.num && !seen.has(x.id)) {
         const c = BY_ID.get(x.id); if (!c) continue;
-        rows.push({ type: "site", name: c.name, credits: c.credits, control: controlFor(c, e.parity), termpaper: !!c.termpaper, sid: c.sid });
+        seen.add(c.id);
+        rows.push({ type: "site", name: c.name, credits: c.credits, control: controlFor(c, e.parity), termpaper: !!c.termpaper, url: courseUrl(c.id, c.sid) });
       }
       return rows;
     }
     function totals(rows) {
-      const t = { n: rows.length, credits: 0, exam: 0, zalik: 0, diff: 0, cw: 0, unknown: 0 };
+      const t = { n: 0, credits: 0, exam: 0, zalik: 0, diff: 0, cw: 0, unknown: 0, grades: [] };
       rows.forEach(r => {
         t.credits += r.credits || 0;
+        const g = parseFloat(r.grade?.zvo);
+        if (Number.isFinite(g)) t.grades.push(g);
+        if (r.type === "cw") { t.cw++; return; }
+        if (r.type === "prac") return;
+        t.n++;
         if (r.control === "exam") t.exam++; else if (r.control === "credit") t.zalik++; else if (r.control === "diff_credit") t.diff++; else t.unknown++;
         if (r.termpaper) t.cw++;
       });
+      t.avg = t.grades.length ? t.grades.reduce((a, b) => a + b, 0) / t.grades.length : null;
       return t;
     }
-    const TYPE = { mand: "Обов’язкова", plan: "Вибіркова · план", site: "Вибіркова · обрано на сайті" };
+    const TYPE = { mand: "Обов’язкова", celec: "Вибіркова · у навч. плані", cw: "Курсова", prac: "Практика", plan: "Вибіркова · мій план", site: "Вибіркова · обрано на сайті" };
+    const gradeText = g => g && (g.zvo || g.ects || g.nat) ? [g.zvo, g.ects, g.nat].filter(Boolean).join(" · ") : "";
     function renderReport() {
       const sems = reportSemesters();
-      const sel = reportSem === "all" ? sems : reportSem === "plan" ? sems.filter(s => s.inPlan) : sems.filter(s => s.key === reportSem);
+      const sel = reportSem === "all" ? sems : reportSem === "plan" ? sems.filter(s => s.inPlan)
+        : reportSem === "cur" ? sems.filter(s => s.current) : reportSem === "past" ? sems.filter(s => s.past) : sems.filter(s => s.key === reportSem);
       const shownSems = sel.length ? sel : sems;
       const blocks = shownSems.map(e => ({ e, rows: reportRows(e) }));
       const all = totals(blocks.flatMap(b => b.rows));
+      const st = account?.curriculum?.student;
       const tile = (n, l, cls = "") => `<div class="tile ${cls}"><b>${n}</b><span>${l}</span></div>`;
+      const tilesHTML = (t, total) => `${tile(fmt(t.credits), total ? "кредитів разом" : "кредитів")}${tile(t.exam, "екзаменів", "exam")}${tile(t.zalik + t.diff, "заліків" + (t.diff ? ` (${t.diff} диф.)` : ""), "zalik")}${tile(t.cw, "курсових")}${t.avg != null ? tile(t.avg.toFixed(1), "середній бал") : tile(t.n, "дисциплін")}`;
+      const chip = (k, l) => `<button class="chip ${reportSem === k ? "on" : ""}" data-rsem="${k}">${l}</button>`;
       $("#view-report").innerHTML = `
         <div class="report-head">
           <div><h1>Звіт по семестрах</h1>
-            <p class="hint">${account ? "Обов’язкові — з вашого акаунта, вибіркові — з плану і вкладки «Обрані мною»." : "Тут лише вибіркові з плану. Через розширення на dl.tntu.edu.ua сюди додаються обов’язкові з акаунта."}</p></div>
+            <p class="hint">${st ? `${esc(st.speciality)} · ${st.courseYear || "?"} курс, група ${esc(st.group)}${st.planName ? ` · план ${esc(st.planName)}` : ""}. Дані з «Індивідуального навчального плану», вкладок вибіркових і вашого плану.`
+              : account ? "Обов’язкові — з вашого акаунта, вибіркові — з плану і вкладки «Обрані мною»." : "Тут лише вибіркові з плану. Через розширення на dl.tntu.edu.ua сюди додаються дані з акаунта."}</p></div>
           <div class="row"><button id="rep-copy">Копіювати для Excel</button><button id="rep-print">Друк</button></div>
         </div>
         <div class="semtabs">
-          ${sems.some(s => s.inPlan) && account ? `<button class="chip ${reportSem === "plan" ? "on" : ""}" data-rsem="plan">Наступний рік (план)</button>` : ""}
-          <button class="chip ${reportSem === "all" || (!account && reportSem === "plan") ? "on" : ""}" data-rsem="all">Усі семестри</button>
-          ${sems.map(s => `<button class="chip ${reportSem === s.key ? "on" : ""}" data-rsem="${s.key}">${esc(s.label)}</button>`).join("")}
+          ${account && sems.some(s => s.inPlan) ? chip("plan", "Наступний рік (план)") : ""}
+          ${sems.some(s => s.current) ? chip("cur", "Поточний семестр") : ""}
+          ${sems.some(s => s.past) ? chip("past", "Завершені") : ""}
+          <button class="chip ${reportSem === "all" || (!account && reportSem === "plan") ? "on" : ""}" data-rsem="all">Усі</button>
+          ${sems.map(s => chip(s.key, esc(s.label))).join("")}
         </div>
-        ${blocks.length > 1 ? `<div class="tiles summary">${tile(fmt(all.credits), "кредитів разом")}${tile(all.exam, "екзаменів", "exam")}${tile(all.zalik + all.diff, "заліків" + (all.diff ? ` (${all.diff} диф.)` : ""), "zalik")}${tile(all.cw, "курсових")}${tile(all.n, "дисциплін")}</div>` : ""}
+        ${blocks.length > 1 ? `<div class="tiles summary">${tilesHTML(all, true)}</div>` : ""}
         ${blocks.map(({ e, rows }) => {
           const t = totals(rows);
           const p = plan.find(x => x.key === e.key);
-          return `<section class="rsem">
+          const cs = curSem(e.num);
+          const hasGrade = rows.some(r => gradeText(r.grade));
+          const hasCw = rows.some(r => r.termpaper);
+          return `<section class="rsem ${e.past ? "past" : ""}">
             <div class="rsem-head"><h2>${esc(e.label)}${e.sub ? ` <span>${e.sub}</span>` : ""}</h2>
-              ${p && +p.target ? `<span class="hint">вибіркових ${fmt(planSum(p))} з ${fmt(+p.target)} кр.</span>` : ""}</div>
-            <div class="tiles">${tile(fmt(t.credits), "кредитів")}${tile(t.exam, "екзаменів", "exam")}${tile(t.zalik + t.diff, "заліків" + (t.diff ? ` (${t.diff} диф.)` : ""), "zalik")}${tile(t.cw, "курсових")}${tile(t.n, "дисциплін")}</div>
+              <span class="hint">${cs?.total ? `за планом ${fmt(cs.total)} кр.${cs.electiveCredits ? `, з них вибіркових ${fmt(cs.electiveCredits)}` : ""}` : ""}${p && +p.target ? ` · у моєму плані ${fmt(planSum(p))} з ${fmt(+p.target)} кр.` : ""}</span></div>
+            <div class="tiles">${tilesHTML(t)}</div>
             ${rows.length ? `<div class="tbl-wrap"><table class="tbl">
-              <thead><tr><th>Дисципліна</th><th>Тип</th><th class="num">Кредити</th><th>Контроль</th><th>Курсова</th></tr></thead>
-              <tbody>${rows.map(r => `<tr class="t-${r.type}"><td><a href="https://dl.tntu.edu.ua/mods/syllabus/view.php?sid=${esc(r.sid)}" target="_blank" rel="noopener">${esc(r.name)}</a></td>
+              <thead><tr><th>Дисципліна</th><th>Тип</th><th class="num">Кредити</th><th>Контроль</th>${hasCw ? "<th>Курсова</th>" : ""}${hasGrade ? "<th>Оцінка</th>" : ""}</tr></thead>
+              <tbody>${rows.map(r => `<tr class="t-${r.type}"><td>${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a>` : esc(r.name)}</td>
                 <td><span class="type ${r.type}">${TYPE[r.type]}</span></td><td class="num">${fmt(r.credits)}</td>
-                <td>${r.control ? `<span class="ctl ${ctlClass(r.control)}">${CONTROL[r.control]}</span>` : `<span class="hint">?</span>`}</td>
-                <td>${r.termpaper ? "так" : ""}</td></tr>`).join("")}</tbody>
-              <tfoot><tr><td>Разом</td><td></td><td class="num">${fmt(t.credits)}</td><td>${t.exam} екз · ${t.zalik + t.diff} зал${t.unknown ? ` · ${t.unknown} ?` : ""}</td><td>${t.cw || ""}</td></tr></tfoot>
+                <td>${r.control ? `<span class="ctl ${r.type === "cw" ? "" : ctlClass(r.control)}">${CONTROL[r.control] || esc(r.control)}</span>` : r.type === "prac" ? "" : `<span class="hint">?</span>`}</td>
+                ${hasCw ? `<td>${r.termpaper ? "так" : ""}</td>` : ""}${hasGrade ? `<td class="grade">${esc(gradeText(r.grade))}</td>` : ""}</tr>`).join("")}</tbody>
+              <tfoot><tr><td>Разом</td><td></td><td class="num">${fmt(t.credits)}</td><td>${t.exam} екз · ${t.zalik + t.diff} зал${t.cw ? ` · ${t.cw} курс.` : ""}${t.unknown ? ` · ${t.unknown} ?` : ""}</td>${hasCw ? "<td></td>" : ""}${hasGrade ? `<td>${t.avg != null ? "сер. " + t.avg.toFixed(1) : ""}</td>` : ""}</tr></tfoot>
             </table></div>` : `<p class="hint">Немає дисциплін.</p>`}
           </section>`;
         }).join("")}`;
@@ -605,8 +655,9 @@
       if (b.dataset.rsem) { reportSem = b.dataset.rsem; store.set("reportSem", reportSem); render(); }
       const blocks = window.__elReport || [];
       if (b.id === "rep-copy") {
-        const lines = ["Семестр\tДисципліна\tТип\tКредити\tКонтроль\tКурсова"];
-        blocks.forEach(({ e, rows }) => rows.forEach(r => lines.push([e.label, r.name, TYPE[r.type], String(r.credits).replace(".", ","), CONTROL[r.control] || "", r.termpaper ? "так" : ""].join("\t"))));
+        const lines = ["Семестр\tДисципліна\tТип\tКредити\tКонтроль\tКурсова\tОцінка"];
+        blocks.forEach(({ e, rows }) => rows.forEach(r => lines.push([e.label, r.name, TYPE[r.type], String(r.credits).replace(".", ","),
+          CONTROL[r.control] || r.control || "", r.termpaper ? "так" : "", gradeText(r.grade)].join("\t"))));
         navigator.clipboard.writeText(lines.join("\n")).then(() => { b.textContent = "Скопійовано ✓"; });
       }
       if (b.id === "rep-print") {
@@ -616,10 +667,10 @@
           <style>body{font:13px system-ui,sans-serif;margin:24px;color:#111}h2{margin:22px 0 4px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:4px 6px;text-align:left}tfoot td{font-weight:700}.s{color:#555;margin:0 0 6px}</style>
           <h1>Звіт по семестрах${account?.speciality ? " — " + esc(account.speciality) : ""}</h1>` +
           blocks.map(({ e, rows }) => { const t = totals(rows); return `<h2>${esc(e.label)}${e.sub ? " (" + e.sub + ")" : ""}</h2>
-            <p class="s">${fmt(t.credits)} кредитів · ${t.exam} екзаменів · ${t.zalik + t.diff} заліків · ${t.cw} курсових</p>
-            <table><tr><th>Дисципліна</th><th>Тип</th><th>Кредити</th><th>Контроль</th><th>Курсова</th></tr>
-            ${rows.map(r => `<tr><td>${esc(r.name)}</td><td>${TYPE[r.type]}</td><td>${fmt(r.credits)}</td><td>${CONTROL[r.control] || "?"}</td><td>${r.termpaper ? "так" : ""}</td></tr>`).join("")}
-            <tfoot><tr><td>Разом</td><td></td><td>${fmt(t.credits)}</td><td>${t.exam} екз / ${t.zalik + t.diff} зал</td><td>${t.cw}</td></tr></tfoot></table>`; }).join(""));
+            <p class="s">${fmt(t.credits)} кредитів · ${t.exam} екзаменів · ${t.zalik + t.diff} заліків · ${t.cw} курсових${t.avg != null ? ` · середній бал ${t.avg.toFixed(1)}` : ""}</p>
+            <table><tr><th>Дисципліна</th><th>Тип</th><th>Кредити</th><th>Контроль</th><th>Оцінка</th></tr>
+            ${rows.map(r => `<tr><td>${esc(r.name)}</td><td>${TYPE[r.type]}</td><td>${fmt(r.credits)}</td><td>${CONTROL[r.control] || r.control || ""}${r.termpaper ? " + курсова" : ""}</td><td>${esc(gradeText(r.grade))}</td></tr>`).join("")}
+            <tfoot><tr><td>Разом</td><td></td><td>${fmt(t.credits)}</td><td>${t.exam} екз / ${t.zalik + t.diff} зал / ${t.cw} курс.</td><td>${t.avg != null ? t.avg.toFixed(1) : ""}</td></tr></tfoot></table>`; }).join(""));
         w.document.close(); w.focus(); w.print();
       }
     });
@@ -745,7 +796,7 @@
           `рік: ${c.year || "?"}`, `рейтинг: ${Math.round(c.rating)}`, recommended.has(c.id) ? "РЕКОМЕНДУЄ ВИПУСКОВА КАФЕДРА" : "", stars.has(c.id) ? "студент позначив ★" : "",
           c.termpaper ? "є курсова" : "", blockState(c)?.similar ? `схоже на обов’язкову «${blockState(c).match}»` : "", c.lang === "en" ? "мова: англійська" : "", DEP_NAME[c.department] || "", c.objective ? "мета: " + c.objective.slice(0, 170) : ""].filter(Boolean).join(" | ");
         const planned = basket.filter(x => x.sem === s.key).map(x => `${BY_ID.get(x.id).name} (${x.credits} кр.)`);
-        const mand = (account?.mandatory || []).map(m => m.name).concat(manualMandatory.split("\n").map(t => t.trim()).filter(Boolean));
+        const mand = mandatoryNames;
         const y = studyYear(s);
         const rules = [
           aiRules.nomand && "Уникай курсів з позначкою «схоже на обов’язкову» і тих, що за змістом повторюють обов’язкові; бери їх лише якщо без них не вийде потрібна сума кредитів або вони явно відповідають побажанням.",
@@ -756,7 +807,7 @@
 Спеціальність: ${account?.speciality || "не вказано"}.
 Семестр: ${s.label}. Треба добрати рівно ${fmt(need)} кредитів ЄКТС.
 ${planned.length ? `Уже в плані цього семестру: ${planned.join("; ")}.` : ""}
-Обов’язкові дисципліни студента (не пропонуй курси, що дублюють їхній зміст): ${[...new Set(mand)].slice(0, 90).join("; ") || "невідомо"}.
+Обов’язкові й уже вивчені дисципліни студента (не пропонуй курси, що дублюють їхній зміст): ${[...new Set(mand)].slice(0, 120).join("; ") || "невідомо"}.
 Побажання студента: ${$("#ai-wish").value.trim() || "немає, обери найкорисніше для спеціальності"}.
 ${rules.length ? "Обов’язкові правила:\n- " + rules.join("\n- ") : ""}
 
