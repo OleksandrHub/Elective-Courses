@@ -9,10 +9,13 @@
       const el = $("#account");
       if (!env.live) el.innerHTML = "";
       else if (accountState === "loading" && !account) el.innerHTML = `<span class="acc muted">Читаю акаунт…</span>`;
-      else if (accountState === "error" && !account) el.innerHTML = `<button class="acc bad" id="acc-refresh" title="${esc(accountError)}">Акаунт не прочитано — ще раз</button>`;
+      else if (accountState === "error" && !account) el.innerHTML = env.importInfo
+        ? `<button class="acc" id="acc-refresh" title="Імпортувати обов’язкові, навчальний план і вибір з вашого акаунта"><span class="ava">📥</span><span class="acc-name">Імпорт з акаунта</span></button>`
+        : `<button class="acc bad" id="acc-refresh" title="${esc(accountError)}">Акаунт не прочитано — ще раз</button>`;
       else if (account) el.innerHTML = `<button class="acc" id="acc-refresh" title="Оновлено ${esc(account.at)}. Натисніть, щоб оновити.">
           <span class="ava">👤</span><span class="acc-name">${esc(account.speciality || "Акаунт")}</span><small class="acc-st ${accountState === "loading" ? "spinning" : ""}">${accountState === "error" ? "!" : "↻"}</small></button>`;
-      const r = $("#acc-refresh"); if (r) r.onclick = loadAccount;
+      // On the web app the account can only be refreshed by running the import bookmarklet again.
+      const r = $("#acc-refresh"); if (r) r.onclick = env.importInfo ? showImportHelp : loadAccount;
 
       const ma = $("#mand-account");
       if (account?.mandatory?.length) {
@@ -52,7 +55,7 @@
       try {
         const acc = await env.loadAccount();
         const first = !account;
-        account = { ...acc, at: new Date().toLocaleString("uk-UA", { dateStyle: "short", timeStyle: "short" }) };
+        account = { ...acc, at: acc.at || new Date().toLocaleString("uk-UA", { dateStyle: "short", timeStyle: "short" }) };
         account.majorId = guessMajor(account.speciality);
         store.set("account", account);
         if (account.plan?.length) setPlanSemesters(account.plan.map(p => semEntry(p.num, String(p.left))));

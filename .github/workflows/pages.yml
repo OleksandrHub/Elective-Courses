@@ -1,0 +1,48 @@
+# Publishes the web app (dist/web) to GitHub Pages.
+# - on push to main: deploys with the catalog committed in extension/courses.json;
+# - nightly and on manual run: re-scrapes dl.tntu.edu.ua first, so the catalog stays fresh.
+# Enable once: repository Settings -> Pages -> Source: "GitHub Actions".
+name: Deploy web app
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 1 * * *"   # 01:00 UTC = 03:00/04:00 Kyiv
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Refresh course catalog from dl.tntu.edu.ua
+        if: github.event_name != 'push'
+        run: python3 scrape.py
+      - name: Build web app
+        run: python3 build_web.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

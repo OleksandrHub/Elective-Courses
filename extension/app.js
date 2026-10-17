@@ -1293,7 +1293,7 @@
           <div><h1>Звіт по семестрах</h1>
             ${variants.length > 1 ? `<div class="vtabs" style="margin:6px 0 4px">${variants.map(v => `<button class="vtab ${v.id === activeVariant ? "on" : ""}" data-vsel="${v.id}">${esc(v.name)}</button>`).join("")}</div>` : ""}
             <p class="hint">${st ? `${esc(st.speciality)} · ${st.courseYear || "?"} курс, група ${esc(st.group)}${st.planName ? ` · план ${esc(st.planName)}` : ""}. Дані з «Індивідуального навчального плану», вкладок вибіркових і вашого плану.`
-              : account ? "Обов’язкові — з вашого акаунта, вибіркові — з плану і вкладки «Обрані мною»." : "Тут лише вибіркові з плану. Через розширення на dl.tntu.edu.ua сюди додаються дані з акаунта."}</p></div>
+              : account ? "Обов’язкові — з вашого акаунта, вибіркові — з плану і вкладки «Обрані мною»." : "Тут лише вибіркові з плану. Імпортуйте дані акаунта (або скористайтеся розширенням), щоб додати обов’язкові й навчальний план."}</p></div>
           <div class="row"><button class="rb-btn" id="rep-copy">⧉ Копіювати для Excel</button><button class="rb-btn" id="rep-print">⎙ Друк</button></div>
         </div>
         <div class="semtabs">
@@ -1783,9 +1783,10 @@ ${pool.map(line).join("\n")}`;
         <p class="hint">Чинні з 17.10.2026 · автор Олександр Кліщ</p>
         <h3>1. Що це</h3><p>Неофіційний допоміжний інструмент для пошуку й порівняння вибіркових дисциплін на dl.tntu.edu.ua. <b>Не є продуктом ТНТУ</b> і не пов’язаний з університетом.</p>
         <h3>2. Ваші дані</h3><ul>
-          <li>Розширення читає сторінки сайту у вашій уже відкритій сесії (обов’язкові, «Обрані мною», «Мене цікавлять», навчальний план). Логін і пароль воно не бачить і не зберігає.</li>
+          <li>Розширення або закладка-імпорт читають сторінки сайту у вашій уже відкритій сесії (обов’язкові, «Обрані мною», «Мене цікавлять», навчальний план). Логін і пароль вони не бачать і не зберігають.</li>
+          <li>У вебзастосунку імпортовані дані передаються з dl.tntu.edu.ua у застосунок через частину посилання після «#», яка не надсилається на жоден сервер.</li>
           <li>План, варіанти, ★ і налаштування зберігаються <b>лише у вашому браузері</b>. Автор їх не отримує.</li>
-          <li>Розширення <b>нічого не змінює</b> у вашому акаунті й не подає заяв від вашого імені.</li></ul>
+          <li>Інструмент <b>нічого не змінює</b> у вашому акаунті й не подає заяв від вашого імені.</li></ul>
         <h3>3. ШІ-підбір (Gemini)</h3><ul>
           <li>Працює лише з вашим власним API-ключем Gemini, який зберігається у вашому браузері.</li>
           <li>У Google надсилаються: спеціальність, назви обов’язкових і вивчених дисциплін, побажання і перелік курсів. Оцінки, ПІБ, логін і пароль — ні.</li>
@@ -1799,7 +1800,7 @@ ${pool.map(line).join("\n")}`;
      * this value asks everyone to accept again.
      * @type {string}
      */
-    const TERMS_VERSION = "2026-10-17";
+    const TERMS_VERSION = "2026-10-17.2";
     /**
      * Whether the user has accepted the current terms revision.
      * @returns {boolean}
@@ -1817,7 +1818,7 @@ ${pool.map(line).join("\n")}`;
       g.className = "gate";
       g.innerHTML = `<div class="gate-box" role="dialog" aria-modal="true" aria-labelledby="gate-title">
         <div class="gate-intro"><span class="logo">В</span><div><b id="gate-title">Перед початком прочитайте умови користування</b>
-          <div class="hint">Це займе хвилину: тут про те, які дані читає розширення, що надсилається в Gemini і чому дані перед заявою треба перевіряти.</div></div></div>
+          <div class="hint">Це займе хвилину: тут про те, які дані читає інструмент, що надсилається в Gemini і чому дані перед заявою треба перевіряти.</div></div></div>
         <div class="gate-doc doc">${DOCS.terms}</div>
         <div class="gate-actions">
           <label class="check"><input type="checkbox" id="gate-ok"> Умови прочитано, погоджуюсь з ними</label>
@@ -1911,10 +1912,13 @@ ${pool.map(line).join("\n")}`;
       const el = $("#account");
       if (!env.live) el.innerHTML = "";
       else if (accountState === "loading" && !account) el.innerHTML = `<span class="acc muted">Читаю акаунт…</span>`;
-      else if (accountState === "error" && !account) el.innerHTML = `<button class="acc bad" id="acc-refresh" title="${esc(accountError)}">Акаунт не прочитано — ще раз</button>`;
+      else if (accountState === "error" && !account) el.innerHTML = env.importInfo
+        ? `<button class="acc" id="acc-refresh" title="Імпортувати обов’язкові, навчальний план і вибір з вашого акаунта"><span class="ava">📥</span><span class="acc-name">Імпорт з акаунта</span></button>`
+        : `<button class="acc bad" id="acc-refresh" title="${esc(accountError)}">Акаунт не прочитано — ще раз</button>`;
       else if (account) el.innerHTML = `<button class="acc" id="acc-refresh" title="Оновлено ${esc(account.at)}. Натисніть, щоб оновити.">
           <span class="ava">👤</span><span class="acc-name">${esc(account.speciality || "Акаунт")}</span><small class="acc-st ${accountState === "loading" ? "spinning" : ""}">${accountState === "error" ? "!" : "↻"}</small></button>`;
-      const r = $("#acc-refresh"); if (r) r.onclick = loadAccount;
+      // On the web app the account can only be refreshed by running the import bookmarklet again.
+      const r = $("#acc-refresh"); if (r) r.onclick = env.importInfo ? showImportHelp : loadAccount;
 
       const ma = $("#mand-account");
       if (account?.mandatory?.length) {
@@ -1954,7 +1958,7 @@ ${pool.map(line).join("\n")}`;
       try {
         const acc = await env.loadAccount();
         const first = !account;
-        account = { ...acc, at: new Date().toLocaleString("uk-UA", { dateStyle: "short", timeStyle: "short" }) };
+        account = { ...acc, at: acc.at || new Date().toLocaleString("uk-UA", { dateStyle: "short", timeStyle: "short" }) };
         account.majorId = guessMajor(account.speciality);
         store.set("account", account);
         if (account.plan?.length) setPlanSemesters(account.plan.map(p => semEntry(p.num, String(p.left))));
@@ -1970,6 +1974,48 @@ ${pool.map(line).join("\n")}`;
         accountState = "error"; accountError = e.message || String(e);
       }
       render();
+    }
+
+    // ---------- Account import (web app) ----------
+    /**
+     * Opens the dialog that explains the import bookmarklet used by the web app.
+     *
+     * A web page cannot read dl.tntu.edu.ua with the student's session, so the
+     * bookmarklet runs *on* dl.tntu.edu.ua, reads the account pages there and
+     * sends the result back in the URL fragment (see web/import-entry.js).
+     * Only shown when the host passes `env.importInfo` (web/main.js).
+     */
+    function showImportHelp() {
+      const info = env.importInfo;
+      $("#modal-body").innerHTML = `<div class="doc import-help">
+        <h2>Імпорт даних акаунта</h2>
+        <p>Застосунок не може сам зайти у ваш акаунт, тому дані переносить <b>закладка</b>: ви натискаєте її на dl.tntu.edu.ua,
+          вона читає обов’язкові дисципліни, навчальний план і вибір, і відкриває застосунок уже з ними. Пароль нікуди не передається.</p>
+        <h3>На компʼютері</h3>
+        <ol>
+          <li>Перетягніть кнопку на панель закладок: <a class="bm" href="${esc(info.bookmarklet)}" onclick="event.preventDefault(); alert('Перетягніть цю кнопку на панель закладок, а потім натисніть її на сторінці dl.tntu.edu.ua.')">📥 Імпорт ТНТУ</a></li>
+          <li>Відкрийте <a href="https://dl.tntu.edu.ua/" target="_blank" rel="noopener">dl.tntu.edu.ua</a> і увійдіть в акаунт.</li>
+          <li>Натисніть закладку «📥 Імпорт ТНТУ». За кілька секунд відкриється цей застосунок з вашими даними.</li>
+        </ol>
+        <h3>На телефоні</h3>
+        <ol>
+          <li>Скопіюйте код закладки: <button class="rb-btn" id="bm-copy">⧉ Копіювати код</button></li>
+          <li>Додайте в браузері будь-яку закладку, відредагуйте її: назва «Імпорт ТНТУ», а в поле адреси вставте скопійований код.</li>
+          <li>Відкрийте dl.tntu.edu.ua, увійдіть, наберіть в адресному рядку «Імпорт ТНТУ» і виберіть закладку зі списку.</li>
+        </ol>
+        <p class="hint">Повторіть імпорт, коли щось зміниться на сайті (наприклад, після вибору дисциплін).
+          ${account ? `Останній імпорт: ${esc(account.at)}.` : ""}</p>
+        ${account ? `<div class="row"><button class="ghost" id="import-forget">Видалити імпортовані дані з цього браузера</button></div>` : ""}
+      </div>`;
+      $("#modal").hidden = false;
+      $("#bm-copy").onclick = e => navigator.clipboard.writeText(info.bookmarklet).then(() => { e.target.textContent = "Скопійовано ✓"; });
+      const forget = $("#import-forget");
+      if (forget) forget.onclick = () => {
+        if (!confirm("Видалити імпортовані дані акаунта з цього браузера?")) return;
+        info.forget();
+        account = null; store.set("account", null); accountState = "error";
+        rebuildAccount(); $("#modal").hidden = true; render();
+      };
     }
 
     // ---------- Keyboard ----------

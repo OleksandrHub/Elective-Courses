@@ -28,10 +28,16 @@ ICON_SIZES = (16, 32, 48, 128)
 EXCLUDE = {"data.js"}   # data.js is only for the standalone index.html
 
 
-def make_icons():
-    """Render the "В" logo icons (TNTU slate background) into extension/icons/.
+def make_icons(out_dir=None, sizes=ICON_SIZES, maskable=False):
+    """Render the "В" logo icons (TNTU slate background).
 
     Requires Pillow and a bold font with Cyrillic glyphs (Noto Sans or DejaVu Sans).
+
+    Args:
+        out_dir (Path): Target directory; defaults to extension/icons/.
+        sizes (tuple[int]): Square sizes in pixels, written as icon-<size>.png.
+        maskable (bool): Also write icon-maskable-512.png (full-bleed, logo in the
+            80% safe zone) for PWA launchers that crop icons to circles.
     """
     from PIL import Image, ImageDraw, ImageFont
 
@@ -39,20 +45,26 @@ def make_icons():
     font_path = next((f for f in fonts if Path(f).exists()), None)
     if not font_path:
         sys.exit("No bold Cyrillic font found for icons")
-    (EXT / "icons").mkdir(exist_ok=True)
-    for size in ICON_SIZES:
+    out_dir = Path(out_dir or EXT / "icons")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    jobs = [(size, False) for size in sizes] + ([(512, True)] if maskable else [])
+    for size, full_bleed in jobs:
         scale = 4                                   # draw large, downscale for smooth edges
         s = size * scale
         img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
-        d.rounded_rectangle((0, 0, s - 1, s - 1), radius=int(s * 0.22), fill=(64, 93, 114, 255))   # #405D72
-        font = ImageFont.truetype(font_path, int(s * 0.66))
+        if full_bleed:
+            d.rectangle((0, 0, s, s), fill=(64, 93, 114, 255))
+        else:
+            d.rounded_rectangle((0, 0, s - 1, s - 1), radius=int(s * 0.22), fill=(64, 93, 114, 255))   # #405D72
+        font = ImageFont.truetype(font_path, int(s * (0.5 if full_bleed else 0.66)))
         box = d.textbbox((0, 0), "В", font=font)
         x = (s - (box[2] - box[0])) / 2 - box[0]
         y = (s - (box[3] - box[1])) / 2 - box[1]
         d.text((x, y), "В", font=font, fill=(255, 255, 255, 255))
-        img.resize((size, size), Image.LANCZOS).save(EXT / "icons" / f"icon-{size}.png")
-    print(f"Icons written to extension/icons/ ({', '.join(map(str, ICON_SIZES))} px)")
+        name = "icon-maskable-512.png" if full_bleed else f"icon-{size}.png"
+        img.resize((size, size), Image.LANCZOS).save(out_dir / name)
+    print(f"Icons written to {out_dir.relative_to(ROOT)} ({', '.join(str(s) for s, _ in jobs)} px)")
 
 
 def check_manifest():

@@ -201,7 +201,7 @@
           <div><h1>Звіт по семестрах</h1>
             ${variants.length > 1 ? `<div class="vtabs" style="margin:6px 0 4px">${variants.map(v => `<button class="vtab ${v.id === activeVariant ? "on" : ""}" data-vsel="${v.id}">${esc(v.name)}</button>`).join("")}</div>` : ""}
             <p class="hint">${st ? `${esc(st.speciality)} · ${st.courseYear || "?"} курс, група ${esc(st.group)}${st.planName ? ` · план ${esc(st.planName)}` : ""}. Дані з «Індивідуального навчального плану», вкладок вибіркових і вашого плану.`
-              : account ? "Обов’язкові — з вашого акаунта, вибіркові — з плану і вкладки «Обрані мною»." : "Тут лише вибіркові з плану. Через розширення на dl.tntu.edu.ua сюди додаються дані з акаунта."}</p></div>
+              : account ? "Обов’язкові — з вашого акаунта, вибіркові — з плану і вкладки «Обрані мною»." : "Тут лише вибіркові з плану. Імпортуйте дані акаунта (або скористайтеся розширенням), щоб додати обов’язкові й навчальний план."}</p></div>
           <div class="row"><button class="rb-btn" id="rep-copy">⧉ Копіювати для Excel</button><button class="rb-btn" id="rep-print">⎙ Друк</button></div>
         </div>
         <div class="semtabs">

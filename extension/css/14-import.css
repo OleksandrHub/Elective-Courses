@@ -1,0 +1,9 @@
+/* Account-import dialog of the web app (bookmarklet instructions). */
+/* ===== Import help ===== */
+.import-help ol { padding-left: 22px; margin: 6px 0 12px; }
+.import-help li { margin: 6px 0; line-height: 1.6; }
+/* The draggable bookmarklet link, styled as a button. */
+.el-app .import-help a.bm { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 999px; background: var(--navy); color: var(--on-navy);
+  font-weight: 700; text-decoration: none; cursor: grab; box-shadow: var(--shadow); }
+.el-app .import-help a.bm:active { cursor: grabbing; }
+.import-help .rb-btn { vertical-align: middle; }
